@@ -615,7 +615,7 @@
                   autoplay
                   playsinline
                   muted
-                  style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.48); transform-origin: center center; display: none;"
+                  style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.22); transform-origin: center center; display: none;"
                 ></video>
 
                 <!-- ESP32 MJPEG Live Stream Image (WiFi mode) -->
@@ -624,7 +624,7 @@
                   src=""
                   alt="ESP32 Camera Stream"
                   crossorigin="anonymous"
-                  style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.48); transform-origin: center center; display: none;"
+                  style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.22); transform-origin: center center; display: none;"
                   onload="onCameraStreamLoad()"
                   onerror="onCameraStreamError()"
                 />
@@ -2774,13 +2774,13 @@
 
       initCvCanvases();
 
-      // Render zoomed-in center crop (540x540 out of 800x800 = 1.48x zoom) into 160x160 analysis canvas
+      // Render 1.22x zoomed center crop (656x656 out of 800x800 = 82%) into 160x160 analysis canvas
       let imgData = null;
       try {
         const srcW = isVideo ? sourceEl.videoWidth : sourceEl.naturalWidth;
         const srcH = isVideo ? sourceEl.videoHeight : sourceEl.naturalHeight;
-        const cropW = Math.round(srcW * 0.675);
-        const cropH = Math.round(srcH * 0.675);
+        const cropW = Math.round(srcW * 0.82);
+        const cropH = Math.round(srcH * 0.82);
         const cropX = Math.round((srcW - cropW) / 2);
         const cropY = Math.round((srcH - cropH) / 2);
         cvAnalysisCtx.drawImage(sourceEl, cropX, cropY, cropW, cropH, 0, 0, 160, 160);
@@ -2802,7 +2802,7 @@
         ctxLive.strokeStyle = "#2cff55";
         ctxLive.lineWidth = 1;
         ctxLive.beginPath();
-        ctxLive.arc(cLive.width / 2, cLive.height / 2, cLive.width * 0.28, 0, Math.PI * 2);
+        ctxLive.arc(cLive.width / 2, cLive.height / 2, cLive.width * 0.30, 0, Math.PI * 2);
         ctxLive.stroke();
       }
 
@@ -2851,9 +2851,9 @@
           }
           cvBaselineAccumulator = null;
 
-          // Build strict dark target face mask within zoomed optimal zone (radius 44 px around (80,80))
+          // Build strict Black Region mask within optimal zone (radius 48 px around (80,80))
           const cx0 = 80, cy0 = 80;
-          const scanRadius = 44;
+          const scanRadius = 48;
           const rSq = scanRadius * scanRadius;
           let darkCount = 0;
           let staticCount = 0;
@@ -2872,8 +2872,8 @@
               const avgI = (r + g + b) / 3;
               const maxChan = Math.max(r, g, b);
 
-              // Strict Black Target Region Only: reject any bright/wooden/ambient pixels outside black circle!
-              if (avgI <= 95 && maxChan <= 108) {
+              // Rule 1: Strictly mark ONLY the dark Black Region (anything outside or brighter is a MISS)
+              if (avgI <= 88 && maxChan <= 102) {
                 cvTargetDarkMask[maskRowOffset + x] = 1;
                 darkCount++;
               } else {
@@ -2881,7 +2881,7 @@
               }
 
               // Pre-existing warm spots check
-              if ((r >= 135 && g >= 110 && b <= 85 && (r - b) >= 45) || (r >= 140 && b <= 75 && (r - g) >= 20)) {
+              if (r >= 140 && b <= 72 && (r - b) >= 72 && (r - g) >= 26) {
                 staticCount++;
               }
             }
@@ -2889,7 +2889,7 @@
           cvBaselineStaticPx = staticCount;
 
           cvCurrentState = CV_STATE.ARMED;
-          updateCvStateBadge("ARMED (OPTIMAL READY)", "#2cff55");
+          updateCvStateBadge("ARMED (ORANGE TIP ONLY)", "#2cff55");
 
           // Render baseline snapshot to inspector canvas
           const cBase = document.getElementById("canvasBaseline");
@@ -2903,13 +2903,13 @@
           }
 
           const reasonEl = document.getElementById("cvDebugReason");
-          if (reasonEl) reasonEl.innerText = "Stationary target locked & ARMED! Only drops when a Nerf bullet hits the black region.";
-          logTerm(`[Target CV] Black target baseline locked (dark face: ${darkCount} px, static warm: ${cvBaselineStaticPx} px). ARMED! Waiting for Nerf bullet strike...`);
+          if (reasonEl) reasonEl.innerText = "Black Region locked! Only Nerf Orange Tip inside Black Region = HIT (light bounce rejected).";
+          logTerm(`[Target CV] Black Region locked (${darkCount} dark px). ARMED for Nerf Orange Tip (Anti-Glare active)!`);
         }
         return;
       }
 
-      // 3. ARMED / CONFIRMING PHASE: Deterministic 4-Check Event Detector
+      // 3. ARMED / CONFIRMING PHASE: Black Region + Nerf Orange Tip + Anti-Light-Bounce Detector
       if (cvCurrentState === CV_STATE.ARMED || cvCurrentState === CV_STATE.CONFIRMING) {
         if (!cvReferenceBaseline || !cvTargetDarkMask) {
           calibrateTargetBaselineNow();
@@ -2917,7 +2917,7 @@
         }
 
         const cx0 = 80, cy0 = 80;
-        const scanRadius = 44; // Strictly inside zoomed black target region
+        const scanRadius = 48; // Strictly inside Black Region
         const rSq = scanRadius * scanRadius;
 
         let diffPxCount = 0;
@@ -2953,8 +2953,6 @@
 
             // 1. Check Baseline Difference: Has pixel changed vs stationary dark target?
             const delta = (Math.abs(r - baseR) + Math.abs(g - baseG) + Math.abs(b - baseB)) / 3;
-            // Nerf projectile is significantly brighter than the black target (jump >= 40)
-            const isBrighter = ((r + g) >= (baseR + baseG + 40));
 
             if (delta >= cvDiffThreshold) {
               diffPxCount++;
@@ -2964,33 +2962,38 @@
               diffMapData[idx + 3] = 255;
             }
 
-            // CRITICAL INVARIANT: Genuine hit pixel MUST be on the black target face!
-            // If the baseline was background (cardboard/wood/light), ignore it completely!
+            // RULE 1: Anything outside the Black Region is strictly a MISS!
             const isDarkTargetFace = (cvTargetDarkMask[maskRowOffset + x] === 1);
             if (!isDarkTargetFace) continue;
 
-            // 2. Strict Nerf Dart Chromatic Signature (Yellow foam OR Orange tip)
-            // Vibrant Neon Yellow Foam:
-            const isYellowFoam = (
-              r >= 140 &&
-              g >= 115 &&
-              b <= 85 &&
-              (r - b) >= 55 &&
-              (g - b) >= 40 &&
-              (r + g) >= (2.25 * (b + 1)) &&
-              r >= (g - 25)
+            // RULE 2: Anti-Light-Bounce / Anti-Glare Gate
+            // Light bouncing off the black target increases R, G, and B together (db > 32 or dr - dg < 20).
+            // A real Nerf Orange Tip has a strong Red surge (dr >= 65), suppressed Blue (b <= 72, db <= 32),
+            // high chromatic saturation ((r - b)/r >= 52%), and true Orange hue (R >> G > B).
+            const dr = r - baseR;
+            const dg = g - baseG;
+            const db = b - baseB;
+
+            const antiGlarePass = (
+              b <= 72 &&
+              db <= 32 &&
+              dr >= 65 &&
+              (dr - db) >= 55 &&
+              (dr - dg) >= 20 &&
+              (r - b) * 100 >= r * 52
             );
 
-            // High-Intensity Neon Orange Tip + Lalith Red/Orange High-Pass Score:
+            // RULE 3: Strict Nerf Bullet Orange Tip Signature (rejects warm yellow/white light bounce)
             const isOrangeTip = (
-              (r >= 115 && b <= 105 && (r - b) >= 42 && (r - g) >= 8) ||
-              (r >= 120 && (r * 2 - g - b) >= 35 && (r - b) >= 45)
+              r >= 140 &&
+              g >= 35 && g <= 135 &&
+              (r - b) >= 72 &&
+              (r - g) >= 26 && (r - g) <= 135 &&
+              (g - b) >= 12 &&
+              (r * 2 - g - b) >= 95
             );
 
-            const isNerfColor = isYellowFoam || isOrangeTip;
-
-            // Genuine projectile impact pixel: orange/yellow inside optimal zone
-            if (isNerfColor && (delta >= 12 || (r - b) >= 55)) {
+            if (antiGlarePass && isOrangeTip) {
               colorPxCount++;
               sumX += x;
               sumY += y;
@@ -3000,7 +3003,7 @@
               if (y > maxY) maxY = y;
 
               colorMaskData[idx] = 255;     // R
-              colorMaskData[idx + 1] = 210; // G
+              colorMaskData[idx + 1] = 120; // G (Orange Tip visualization)
               colorMaskData[idx + 2] = 0;   // B
               colorMaskData[idx + 3] = 255; // Alpha
             }

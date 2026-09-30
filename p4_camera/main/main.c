@@ -59,9 +59,14 @@ static bool g_is_calibrated = true;
 // Optimal Zone (Green Circle in Camera Viewport: center=(400,400), radius=260px)
 #define TARGET_CENTER_X         400
 #define TARGET_CENTER_Y         400
-#define OPTIMAL_ZONE_RADIUS_PX  175
+#define OPTIMAL_ZONE_RADIUS_PX  210
 #define OPTIMAL_ZONE_RADIUS_SQ  (OPTIMAL_ZONE_RADIUS_PX * OPTIMAL_ZONE_RADIUS_PX)
-static uint8_t s_dark_target_mask[120][120];
+#define GRID_DIM                145
+static uint8_t s_dark_target_mask[GRID_DIM][GRID_DIM];
+static uint8_t s_base_r[GRID_DIM][GRID_DIM];
+static uint8_t s_base_g[GRID_DIM][GRID_DIM];
+static uint8_t s_base_b[GRID_DIM][GRID_DIM];
+static uint8_t s_tip_hit_grid[GRID_DIM][GRID_DIM];
 
 static int g_video_fd = -1;
 static uint8_t *g_buffers[2] = {NULL, NULL};
@@ -309,20 +314,18 @@ static void camera_stream_task(void *arg)
                     .laser_dist_mm = 0.0f
                 };
 
-                // Scan ONLY inside the Zoomed Black Optimal Circle (center=(400,400), radius=175px)
-                // and strictly on pixels whose baseline is the BLACK target (luma <= 95)!
-                int warm_nerf_px = 0;
-                int64_t sum_x = 0;
-                int64_t sum_y = 0;
-                int64_t sum_w = 0;
+                // Scan ONLY inside the Black Region (center=(400,400), radius=210px)
+                // Anything outside the Black Region is a MISS.
+                // Inside the Black Region, detect ONLY the Nerf Bullet Orange Tip while rejecting light bounce/glare!
                 bool do_latch = (now_us >= g_settle_until_us) && g_need_baseline_latch;
+                memset(s_tip_hit_grid, 0, sizeof(s_tip_hit_grid));
 
-                for (int y = 225, gy = 0; y <= 575 && gy < 120; y += 3, gy++) {
+                for (int y = 190, gy = 0; y <= 610 && gy < GRID_DIM; y += 3, gy++) {
                     int dy = y - TARGET_CENTER_Y;
                     int dy_sq = dy * dy;
                     const uint16_t *row = &pixels[y * 800];
 
-                    for (int x = 225, gx = 0; x <= 575 && gx < 120; x += 3, gx++) {
+                    for (int x = 190, gx = 0; x <= 610 && gx < GRID_DIM; x += 3, gx++) {
                         int dx = x - TARGET_CENTER_X;
                         if (dx * dx + dy_sq > OPTIMAL_ZONE_RADIUS_SQ) {
                             if (do_latch) s_dark_target_mask[gy][gx] = 0;
@@ -335,7 +338,7 @@ static void camera_stream_task(void *arg)
                         int b5 = p & 0x1F;
                         int g5 = g6 >> 1;
 
-                        // Convert to 8-bit 0..255 for exact color matching
+                        // Convert to 8-bit 0..255 for exact chromatic and anti-glare checks
                         int r8 = (r5 << 3) | (r5 >> 2);
                         int g8 = (g6 << 2) | (g6 >> 4);
                         int b8 = (b5 << 3) | (b5 >> 2);
@@ -343,26 +346,70 @@ static void camera_stream_task(void *arg)
                         if (do_latch) {
                             int avg_luma = (r8 + g8 + b8) / 3;
                             int max_ch = (r8 > g8) ? ((r8 > b8) ? r8 : b8) : ((g8 > b8) ? g8 : b8);
-                            // Strictly mark ONLY dark black target region pixels (ignore outer background & white rings)
-                            s_dark_target_mask[gy][gx] = (avg_luma <= 95 && max_ch <= 108) ? 1 : 0;
+                            // Strictly mark ONLY dark black target region pixels (anything brighter or outside is MISS)
+                            s_dark_target_mask[gy][gx] = (avg_luma <= 88 && max_ch <= 102) ? 1 : 0;
+                            s_base_r[gy][gx] = (uint8_t)r8;
+                            s_base_g[gy][gx] = (uint8_t)g8;
+                            s_base_b[gy][gx] = (uint8_t)b8;
                         }
 
-                        // Ignore anything outside the black target region!
+                        // Rule 1: Anything outside the Black Region is strictly a MISS!
                         if (s_dark_target_mask[gy][gx] == 0) continue;
 
-                        // 1. Lalith689/camera Red/Orange High-Pass Score:
+                        // Rule 2: Delta from Black-Region Baseline (Anti-Light-Bounce)
+                        int dr = r8 - (int)s_base_r[gy][gx];
+                        int dg = g8 - (int)s_base_g[gy][gx];
+                        int db = b8 - (int)s_base_b[gy][gx];
+
+                        // Light bouncing off black plastic raises R, G, and B together (db > 30 or dr - dg < 20).
+                        // A real Nerf Orange Tip has strong Red surge (dr >= 65), suppressed Blue (b8 <= 72, db <= 32),
+                        // high saturation ((r8 - b8)/r8 >= 52%), and true Orange hue (R >> G > B).
                         int lalith_score = (r5 * 2) - g5 - b5;
-                        bool is_lalith_orange_red = (r8 >= 115 && lalith_score >= 9 && (r8 - b8) >= 45 && r8 >= g8);
+                        bool anti_glare_pass = (
+                            b8 <= 72 &&
+                            db <= 32 &&
+                            dr >= 65 &&
+                            (dr - db) >= 55 &&
+                            (dr - dg) >= 20 &&
+                            (r8 - b8) * 100 >= r8 * 52
+                        );
 
-                        // 2. Nerf Orange Tip / Yellow Foam Chromatic Signature:
-                        bool is_nerf_orange = (r8 >= 125 && g8 >= 42 && b8 <= 95 && (r8 - b8) >= 52 && (r8 - g8) >= 10);
-                        bool is_nerf_yellow = (r8 >= 125 && g8 >= 98 && b8 <= 90 && (r8 - b8) >= 48 && (g8 - b8) >= 32);
+                        bool is_nerf_orange_tip = (
+                            r8 >= 140 &&
+                            g8 >= 35 && g8 <= 135 &&
+                            (r8 - b8) >= 72 &&
+                            (r8 - g8) >= 26 && (r8 - g8) <= 135 &&
+                            (g8 - b8) >= 12 &&
+                            lalith_score >= 12
+                        );
 
-                        if (is_lalith_orange_red || is_nerf_orange || is_nerf_yellow) {
+                        if (anti_glare_pass && is_nerf_orange_tip) {
+                            s_tip_hit_grid[gy][gx] = 1;
+                        }
+                    }
+                }
+
+                // Rule 3: Spatial Contiguity Filter (Nerf Orange Tip forms a compact cluster, NOT scattered glare)
+                int warm_nerf_px = 0;
+                int64_t sum_x = 0;
+                int64_t sum_y = 0;
+                int64_t sum_w = 0;
+
+                for (int gy = 1; gy < GRID_DIM - 1; gy++) {
+                    for (int gx = 1; gx < GRID_DIM - 1; gx++) {
+                        if (!s_tip_hit_grid[gy][gx]) continue;
+                        int neighbors =
+                            s_tip_hit_grid[gy - 1][gx - 1] + s_tip_hit_grid[gy - 1][gx] + s_tip_hit_grid[gy - 1][gx + 1] +
+                            s_tip_hit_grid[gy][gx - 1]     +                              s_tip_hit_grid[gy][gx + 1] +
+                            s_tip_hit_grid[gy + 1][gx - 1] + s_tip_hit_grid[gy + 1][gx] + s_tip_hit_grid[gy + 1][gx + 1];
+                        // Require at least 2 adjacent orange-tip neighbors in 3x3 grid to eliminate isolated glare specks
+                        if (neighbors >= 2) {
                             warm_nerf_px++;
-                            int weight = (r8 - b8);
-                            sum_x += (int64_t)x * weight;
-                            sum_y += (int64_t)y * weight;
+                            int px = 190 + gx * 3;
+                            int py = 190 + gy * 3;
+                            int weight = neighbors + 1;
+                            sum_x += (int64_t)px * weight;
+                            sum_y += (int64_t)py * weight;
                             sum_w += weight;
                         }
                     }
@@ -370,7 +417,7 @@ static void camera_stream_task(void *arg)
 
                 if (now_us >= g_settle_until_us) {
                     if (g_need_baseline_latch) {
-                        s_baseline_warm_px = (warm_nerf_px < 40) ? warm_nerf_px : 0;
+                        s_baseline_warm_px = (warm_nerf_px < 20) ? warm_nerf_px : 0;
                         g_need_baseline_latch = false;
                     }
 
@@ -381,8 +428,8 @@ static void camera_stream_task(void *arg)
                             net_nerf_px = 0;
                         }
 
-                        // Trigger HIT when >= 18 orange/yellow subsampled pixels (~160 full pixels) appear inside the Black Target!
-                        if (net_nerf_px >= 18 && sum_w > 0) {
+                        // Trigger HIT when a solid Nerf Orange Tip cluster (>= 10 core cells = ~90 full pixels) lands inside Black Region!
+                        if (net_nerf_px >= 10 && sum_w > 0) {
                             int hit_x = (int)(sum_x / sum_w);
                             int hit_y = (int)(sum_y / sum_w);
                             if (hit_x == 400 && hit_y == 400) hit_x = 401;
