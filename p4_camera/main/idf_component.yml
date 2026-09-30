@@ -1,0 +1,3 @@
+dependencies:
+  espressif/esp_video: "==2.3.0"
+  espressif/esp_cam_sensor: "==2.3.0"

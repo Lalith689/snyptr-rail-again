@@ -1,0 +1,3601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SNYPTR — 1.74m Moving Target System (Continuous Arrow Drive)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* AUTHENTIC MILITARY PALETTE (FROM SNYPTR REPOSITORY) */
+      --mil-canvas: #ded8ce;           /* Warm stone / light sand canvas */
+      --mil-canvas-tint: #e8e4dc;      /* Lighter warm stone */
+      --mil-card-bg: #f5f2ec;          /* Sand-white card surface */
+      --mil-white: #ffffff;            /* Pure white target / inset */
+      
+      --mil-dark: #242923;             /* Deep tactical olive-slate */
+      --mil-dark-card: #2f352e;        /* Dark tile background */
+      --mil-dark-border: #1a1e19;      /* Strong dark border */
+      --mil-border-light: #c8c2b5;     /* Subtle stone border */
+      
+      --text-dark: #1b1f1a;            /* Primary dark text */
+      --text-muted: #5e665c;           /* Muted text */
+      --text-light: #f5f5f3;           /* White text on dark elements */
+      --text-sand: #d6cfc3;            /* Sand accent text */
+      
+      --mil-hit: #2c5934;              /* Deep military green for hit */
+      --mil-miss: #8a2a2a;             /* Deep brick red for miss */
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    @keyframes optimalHitPulse {
+      0% {
+        stroke: #2cff55;
+        stroke-width: 2.4px;
+        fill: rgba(44, 255, 85, 0.15);
+        filter: drop-shadow(0 0 0px #2cff55);
+      }
+      50% {
+        stroke: #ffffff;
+        stroke-width: 5.5px;
+        fill: rgba(44, 255, 85, 0.65);
+        filter: drop-shadow(0 0 16px #2cff55);
+      }
+      100% {
+        stroke: #2cff55;
+        stroke-width: 2.4px;
+        fill: rgba(44, 255, 85, 0.15);
+        filter: drop-shadow(0 0 0px #2cff55);
+      }
+    }
+    .optimal-hit-active {
+      animation: optimalHitPulse 0.4s ease-in-out 4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: var(--mil-canvas);
+      color: var(--text-dark);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--mil-canvas-tint);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--mil-border-light);
+      border-radius: 2px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--mil-dark);
+    }
+
+    /* Reference-inspired card panels */
+    .ref-panel {
+      background-color: var(--mil-card-bg);
+      border: 1px solid var(--mil-border-light);
+      box-shadow: 0 2px 6px rgba(36, 41, 35, 0.08);
+    }
+
+    /* 3 Hero Command Tiles */
+    .ref-cmd-tile {
+      background: var(--mil-dark-card);
+      border: 2px solid var(--mil-dark-border);
+      color: var(--text-light);
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.12s ease;
+      text-transform: uppercase;
+      position: relative;
+      min-height: 68px;
+    }
+
+    .ref-cmd-tile:hover:not(:disabled) {
+      background: #3a4239;
+      border-color: #525c50;
+      transform: translateY(-1px);
+    }
+
+    .ref-cmd-tile:active:not(:disabled) {
+      background: #1c201b;
+      transform: translateY(1px);
+    }
+
+    .ref-cmd-tile.active-run {
+      background: #283a2a !important;
+      border-color: #4a754e !important;
+      box-shadow: 0 0 14px rgba(74, 117, 78, 0.45);
+    }
+
+    .ref-cmd-tile.active-stop {
+      background: #3a3328 !important;
+      border-color: #736245 !important;
+    }
+
+    .ref-cmd-tile.active-pop {
+      background: #333d36 !important;
+      border-color: #617869 !important;
+    }
+
+    .ref-tile-key {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 2px;
+      letter-spacing: 0.05em;
+    }
+
+    .ref-tile-title {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+    }
+
+    .ref-tile-sub {
+      font-size: 9px;
+      color: var(--text-sand);
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    /* Reference buttons */
+    .ref-btn {
+      background: var(--mil-dark);
+      color: #ffffff;
+      border: 1px solid var(--mil-dark-border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 6px 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.1s ease;
+      user-select: none;
+    }
+
+    .ref-btn:hover:not(:disabled) {
+      background: #384037;
+      transform: translateY(-1px);
+    }
+
+    .ref-btn:active:not(:disabled) {
+      background: #1c201b;
+      transform: translateY(1px);
+    }
+
+    .ref-btn-light {
+      background: #ffffff;
+      color: var(--text-dark);
+      border: 1px solid var(--mil-border-light);
+    }
+
+    .ref-btn-light:hover:not(:disabled) {
+      background: var(--mil-canvas-tint);
+    }
+
+    .ref-btn-accent {
+      background: #2c5934;
+      border-color: #1e3f24;
+      color: #ffffff;
+    }
+    .ref-btn-accent:hover:not(:disabled) {
+      background: #366d40;
+    }
+
+    .ref-btn-shuttle-active {
+      background: #283a2a !important;
+      border-color: #4a754e !important;
+      box-shadow: 0 0 12px rgba(74, 117, 78, 0.5) !important;
+      animation: pulse-shuttle 1.5s infinite;
+    }
+
+    @keyframes pulse-shuttle {
+      0%, 100% { border-color: #4a754e; }
+      50% { border-color: #88c28e; }
+    }
+
+    .carriage-marker {
+      transition: left 0.15s linear;
+    }
+
+    .stop-marker-transition {
+      transition: left 0.1s ease-out;
+    }
+  </style>
+</head>
+<body style="display: flex; flex-direction: column; height: 100vh; overflow: hidden;">
+
+  <!-- Tactical Header -->
+  <div style="user-select: none; display: flex; flex-direction: column;">
+    <!-- Top Banner -->
+    <header style="
+      background-color: #272c26;
+      padding: 7px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1a1e19;
+    ">
+      <!-- Left: Boxed Logo Badge -->
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="
+          border: 2px solid #ffffff;
+          padding: 3px 10px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background-color: #1d221c;
+        ">
+          <span style="font-size: 14px; color: #ffffff;">⊕</span>
+          <span style="
+            font-family: var(--font-mono);
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            color: #ffffff;
+          ">
+            SNYPTR
+          </span>
+        </div>
+
+        <div style="
+          font-family: var(--font-sans);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          color: var(--text-sand);
+          text-transform: uppercase;
+        ">
+          1.74m Rail System // GT2 30T Pulley (33.33 steps/cm)
+        </div>
+      </div>
+
+      <!-- Right: Connection & Status Controls -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <a href="drive-dashboard.html" class="ref-btn" style="text-decoration:none; background:#1b4d3e; color:#2cff55; border: 1px solid #2cff55; padding:5px 10px;" title="Switch to 2D Car Manual Cockpit">
+          🚗 2D CAR DASHBOARD ↗
+        </a>
+        <!-- Serial Connection Status Pill -->
+        <button id="btnConnectSerial" onclick="toggleConnectSerial()" class="ref-btn ref-btn-accent" style="display: flex; align-items: center; gap: 6px;" title="Connect directly to ESP32 over USB at 115200 baud">
+          <span id="serialStatusDot" style="width: 7px; height: 7px; border-radius: 50%; background-color: #ffcc00; display: inline-block;"></span>
+          <span id="serialStatusText">CONNECT ESP32</span>
+        </button>
+
+        <!-- System State Pill -->
+        <span id="headerSysStatus" style="
+          background-color: #353c34;
+          color: #ffffff;
+          padding: 5px 10px;
+          font-family: var(--font-mono);
+          font-size: 11px;
+          font-weight: 700;
+        ">
+          SYS: READY
+        </span>
+
+        <span style="
+          background-color: #1d221c;
+          border: 1px solid #3a4239;
+          color: var(--text-sand);
+          padding: 5px 10px;
+          font-family: var(--font-mono);
+          font-size: 11px;
+          font-weight: 700;
+        ">
+          SESSION 01
+        </span>
+
+        <a href="drive-dashboard.html" class="ref-btn" style="text-decoration: none; background-color: #2b3329; border-color: #4b5847;" title="Switch to 2D Car Arrow Drive dashboard (no distance parameters)">
+          2D CAR ARROW DRIVE ↗
+        </a>
+
+        <button onclick="resetSession()" class="ref-btn">
+          NEW SESSION
+        </button>
+
+        <button onclick="toggleTerminalModal()" class="ref-btn ref-btn-light" title="Open Serial Console">
+          LOG / TERMINAL
+        </button>
+      </div>
+    </header>
+
+    <!-- Sub-Bar Navigation Strip (Arrow & Control Shortcuts) -->
+    <div style="
+      background-color: #1e221d;
+      padding: 5px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-sand);
+      border-bottom: 1px solid var(--mil-border-light);
+    ">
+      <div style="display: flex; gap: 16px; font-weight: 600;">
+        <span><b style="color: #ffffff;">[R]</b> RETURN TO 0.0m ORIGIN</span>
+        <span><b style="color: #ffffff;">[S / SPACE]</b> START / STOP TARGET</span>
+        <span><b style="color: #ffffff;">[◄ / ←]</b> DRIVE TO 0.0m</span>
+        <span><b style="color: #ffffff;">[► / →]</b> DRIVE TO STOP POINT</span>
+        <span><b style="color: #ffffff;">[▲ / ▼]</b> AUTO SHUTTLE</span>
+        <span><b style="color: #ffffff;">[ESC]</b> ESTOP</span>
+      </div>
+
+      <div id="subbarNotice" style="color: #9a9486; font-size: 10px;">
+        PRESS [S] TO START/STOP TARGET // PRESS [R] TO RETURN TO 0.0m ORIGIN
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Operational Container -->
+  <div style="
+    flex: 1;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  ">
+    <!-- Top Session Scoring HUD -->
+    <div style="
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr 1fr;
+      gap: 8px;
+      width: 100%;
+    ">
+      <!-- 20-Shot Progression -->
+      <div class="ref-panel" style="
+        padding: 8px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #ffffff;
+      ">
+        <div>
+          <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700;">
+            ENGAGEMENT
+          </div>
+          <div style="
+            font-family: var(--font-mono);
+            font-size: 22px;
+            font-weight: 900;
+            color: var(--text-dark);
+            line-height: 1.0;
+            margin-top: 2px;
+          ">
+            SHOT <span id="hudShotNum">00</span> <span style="color: var(--text-muted); font-size: 14px; font-weight: 600;">/ 20</span>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700;">
+            REMAINING
+          </div>
+          <div id="hudRemaining" style="
+            font-family: var(--font-mono);
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--mil-dark);
+            margin-top: 1px;
+          ">
+            20
+          </div>
+        </div>
+      </div>
+
+      <!-- Hits -->
+      <div class="ref-panel" style="
+        padding: 8px 14px;
+        background-color: #ffffff;
+        border-left: 4px solid var(--mil-hit);
+      ">
+        <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700;">
+          HITS
+        </div>
+        <div id="hudHits" style="
+          font-family: var(--font-mono);
+          font-size: 22px;
+          font-weight: 900;
+          color: var(--mil-hit);
+          margin-top: 2px;
+          line-height: 1.0;
+        ">
+          0
+        </div>
+      </div>
+
+      <!-- Misses -->
+      <div class="ref-panel" style="
+        padding: 8px 14px;
+        background-color: #ffffff;
+        border-left: 4px solid var(--mil-miss);
+      ">
+        <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700;">
+          MISSES
+        </div>
+        <div id="hudMisses" style="
+          font-family: var(--font-mono);
+          font-size: 22px;
+          font-weight: 900;
+          color: var(--mil-miss);
+          margin-top: 2px;
+          line-height: 1.0;
+        ">
+          0
+        </div>
+      </div>
+
+      <!-- Accuracy -->
+      <div class="ref-panel" style="
+        padding: 8px 14px;
+        background-color: #ffffff;
+        border-left: 4px solid var(--mil-dark);
+      ">
+        <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700;">
+          ACCURACY
+        </div>
+        <div id="hudAccuracy" style="
+          font-family: var(--font-mono);
+          font-size: 22px;
+          font-weight: 900;
+          color: var(--text-dark);
+          margin-top: 2px;
+          line-height: 1.0;
+        ">
+          0.0%
+        </div>
+      </div>
+    </div>
+
+    <!-- Main 2-Column Combat Console -->
+    <main style="
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(400px, 1.05fr) minmax(480px, 1.35fr);
+      gap: 8px;
+      min-height: 0;
+    ">
+      <!-- Left Column: Hero Target Stage -->
+      <div style="min-height: 0; height: 100%;">
+        <div class="ref-panel" style="
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          padding: 10px;
+        ">
+          <!-- Header with View Mode Switcher -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mil-border-light); padding-bottom: 6px;">
+            <div style="display: flex; gap: 4px;">
+              <button id="tabModeCamera" onclick="switchTargetView('camera')" class="ref-btn ref-btn-accent" style="padding: 3px 8px; font-size: 10px;">
+                OPTICAL CAM [LIVE]
+              </button>
+              <button id="tabModeSim" onclick="switchTargetView('sim')" class="ref-btn" style="padding: 3px 8px; font-size: 10px; background-color: #2b3329;">
+                TARGET CANVAS
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span id="camStatusDot" style="width: 7px; height: 7px; border-radius: 50%; background-color: #2cff55; display: inline-block;"></span>
+              <span id="camStatusBadge" style="font-family: var(--font-mono); font-size: 10px; font-weight: 800; color: var(--mil-hit);">
+                STREAM ONLINE
+              </span>
+            </div>
+          </div>
+
+          <!-- Camera Source Selector & USB / WiFi Switcher Strip -->
+          <div style="
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #ffffff;
+            border: 1px solid var(--mil-border-light);
+            padding: 4px 8px;
+          ">
+            <span style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 800; color: var(--text-dark); white-space: nowrap;">
+              📡 P4 STANDALONE TELEMETRY (HIT / MISS ONLY):
+            </span>
+            <span id="shotResultBadge" style="
+              flex: 1;
+              padding: 3px 8px;
+              font-family: var(--font-mono);
+              font-size: 10px;
+              font-weight: 800;
+              text-align: center;
+              background: #141a14;
+              color: #2cff55;
+              border: 1px solid #2cff55;
+              border-radius: 3px;
+            ">
+              READY — CLICK POP TARGET 1 TO ARM
+            </span>
+            <button onclick="resetShots()" class="ref-btn" style="padding: 3px 8px; font-size: 9px; font-weight: 800; background-color: #2b4530;">
+              🔄 RESET
+            </button>
+            <!-- Camera connection button (visible) -->
+            <button id="btnConnectCamSerial" onclick="toggleConnectCameraSerial()" class="ref-btn ref-btn-accent" style="
+              padding: 4px 10px;
+              font-size: 10px;
+              font-weight: 800;
+              background-color: #1a5c2e;
+              color: #ffffff;
+            ">
+              🔌 CONNECT COM17
+            </button>
+            <select id="cameraSourceSelect" style="display:none;"><option value="serial">Serial</option></select>
+            <button id="btnCalibrateBaseline" style="display:none;"></button>
+            <span id="baselineStatusBadge" style="display:none;">[ARMED]</span>
+            <button id="btnToggleCamPower" style="display:none;"></button>
+          </div>
+
+          <!-- Optional WiFi Stream URL (shown only when WiFi MJPEG is selected) -->
+          <div id="wifiStreamRow" style="
+            display: none;
+            margin-top: 4px;
+            align-items: center;
+            gap: 6px;
+            background: #ffffff;
+            border: 1px solid var(--mil-border-light);
+            padding: 3px 8px;
+          ">
+            <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 800; color: var(--text-muted); white-space: nowrap;">
+              WIFI URL:
+            </span>
+            <input
+              id="cameraStreamUrlInput"
+              type="text"
+              value="http://192.168.4.1/"
+              placeholder="http://192.168.4.1/"
+              style="flex: 1; padding: 2px 4px; font-family: var(--font-mono); font-size: 10px; border: 1px solid var(--mil-border-light);"
+            />
+            <button onclick="reloadCameraStream()" class="ref-btn" style="padding: 2px 6px; font-size: 9px;">
+              CONNECT URL
+            </button>
+          </div>
+
+          <!-- Main Display Viewport (Camera Stream OR Target Canvas) -->
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding-top: 6px; min-height: 0;">
+            
+            <!-- 5-Second Exposure Progress Bar -->
+            <div style="width: 100%; max-width: 320px;">
+              <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-muted); margin-bottom: 3px;">
+                <span>5.0s EXPOSURE TIMER</span>
+                <span id="exposureTimerLabel" style="color: var(--text-dark);">READY</span>
+              </div>
+              <div style="width: 100%; height: 5px; background: var(--mil-canvas-tint); border: 1px solid var(--mil-border-light); overflow: hidden;">
+                <div id="exposureProgressBar" style="width: 100%; height: 100%; background: var(--mil-dark); transition: width 0.1s linear;"></div>
+              </div>
+            </div>
+
+            <!-- Video / Target Viewport Container -->
+            <div style="position: relative; padding: 6px; background-color: #2b302a; border: 1px solid #1a1e19; box-shadow: 0 4px 16px rgba(0,0,0,0.25);">
+              
+              <!-- OPTICAL CAMERA VIEW -->
+              <div id="cameraViewportContainer" style="
+                width: 280px;
+                height: 280px;
+                position: relative;
+                background-color: #0d0f0c;
+                border: 1px solid #3d463b;
+                overflow: hidden;
+                cursor: crosshair;
+              " onclick="handleCameraFeedClick(event)">
+                
+                <!-- Direct USB UVC Camera Video Element (Default for ESP32-P4 connected via USB) -->
+                <video
+                  id="webcamVideo"
+                  autoplay
+                  playsinline
+                  muted
+                  style="width: 100%; height: 100%; object-fit: cover; display: none;"
+                ></video>
+
+                <!-- ESP32 MJPEG Live Stream Image (WiFi mode) -->
+                <img
+                  id="espCameraImg"
+                  src=""
+                  alt="ESP32 Camera Stream"
+                  crossorigin="anonymous"
+                  style="width: 100%; height: 100%; object-fit: cover; display: none;"
+                  onload="onCameraStreamLoad()"
+                  onerror="onCameraStreamError()"
+                />
+
+                <!-- Nerf Bullet Stuck Optimal Detection HUD Banner -->
+                <div id="nerfOptimalHudBanner" style="
+                  display: none;
+                  position: absolute;
+                  top: 14px;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  background: rgba(17, 34, 17, 0.94);
+                  border: 2px solid #2cff55;
+                  color: #2cff55;
+                  padding: 5px 14px;
+                  font-family: var(--font-mono);
+                  font-size: 10.5px;
+                  font-weight: 800;
+                  letter-spacing: 0.8px;
+                  border-radius: 4px;
+                  box-shadow: 0 0 18px rgba(44, 255, 85, 0.7);
+                  z-index: 50;
+                  pointer-events: none;
+                  text-align: center;
+                  white-space: nowrap;
+                ">
+                  🎯 OPTIMAL HIT! YELLOW NERF BULLET STUCK
+                </div>
+
+                <!-- Tactical Reticle & Calibration Rings Overlay -->
+                <svg id="cameraReticleSvg" viewBox="0 0 280 280" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                  <line x1="140" y1="0" x2="140" y2="280" stroke="rgba(255,204,0,0.6)" stroke-width="0.8" stroke-dasharray="3 3" />
+                  <line x1="0" y1="140" x2="280" y2="140" stroke="rgba(255,204,0,0.6)" stroke-width="0.8" stroke-dasharray="3 3" />
+                  
+                  <!-- Entire Black Region - Tactical Green Optimal Zone Reticle -->
+                  <circle id="optimalZoneCircle" cx="140" cy="140" r="86" fill="rgba(44, 255, 85, 0.12)" stroke="#2cff55" stroke-width="2.4" />
+                  <circle id="optimalZoneRingDashed" cx="140" cy="140" r="86" fill="none" stroke="#2cff55" stroke-width="1.0" stroke-dasharray="4 3" />
+                  <circle cx="140" cy="140" r="3.5" fill="#2cff55" />
+                  
+                  <!-- Optimal Zone Sight Ticks along r=86 border -->
+                  <line x1="46" y1="140" x2="58" y2="140" stroke="#2cff55" stroke-width="2.5" />
+                  <line x1="222" y1="140" x2="234" y2="140" stroke="#2cff55" stroke-width="2.5" />
+                  <line x1="140" y1="46" x2="140" y2="58" stroke="#2cff55" stroke-width="2.5" />
+                  <line x1="140" y1="222" x2="140" y2="234" stroke="#2cff55" stroke-width="2.5" />
+                  
+                  <!-- Optimal Zone Label -->
+                  <text id="optimalZoneLabel" x="140" y="44" text-anchor="middle" fill="#2cff55" font-size="7.5" font-family="monospace" font-weight="900" letter-spacing="0.6">OPTIMAL ZONE (BLACK REGION)</text>
+                  
+                  <!-- Inner Tactical Sub-Rings -->
+                  <circle cx="140" cy="140" r="27" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.8" stroke-dasharray="2 2" />
+                  <circle cx="140" cy="140" r="56" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.8" stroke-dasharray="2 2" />
+                  
+                  <!-- Corner Framing Brackets -->
+                  <path d="M 15 35 L 15 15 L 35 15" fill="none" stroke="#2cff55" stroke-width="2" />
+                  <path d="M 265 35 L 265 15 L 245 15" fill="none" stroke="#2cff55" stroke-width="2" />
+                  <path d="M 15 245 L 15 265 L 35 265" fill="none" stroke="#2cff55" stroke-width="2" />
+                  <path d="M 265 245 L 265 265 L 245 265" fill="none" stroke="#2cff55" stroke-width="2" />
+                  
+                  <text x="20" y="28" fill="#2cff55" font-size="8" font-family="monospace" font-weight="800">CAM: OPTICAL 1X</text>
+                  <text x="20" y="258" fill="#2cff55" font-size="8" font-family="monospace" font-weight="700">RETICLE: GREEN = OPTIMAL ZONE</text>
+                  <text id="hudCvTelemetry" x="20" y="270" fill="#2cff55" font-size="7.5" font-family="monospace" font-weight="700">CV: STANDBY [AWAITING STREAM]</text>
+                </svg>
+
+                <!-- Dynamic Impact Dots Overlay on Camera -->
+                <div id="camImpactDotsContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+
+                <!-- Fallback Notice -->
+                <div id="cameraOfflineNotice" style="
+                  display: none;
+                  position: absolute;
+                  top: 0; left: 0; right: 0; bottom: 0;
+                  background-color: rgba(13,15,12,0.92);
+                  color: #ffcc00;
+                  font-family: var(--font-mono);
+                  font-size: 11px;
+                  padding: 16px;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  text-align: center;
+                  gap: 8px;
+                ">
+                  <div style="font-weight: 800; color: #ff7777; font-size: 13px;">CAMERA FEED OFFLINE</div>
+                  <div id="cameraOfflineDesc" style="font-size: 10px; color: #d6cfc3; max-width: 240px;">
+                    ESP32-P4 USB camera or WiFi stream not detected.
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px; width: 100%; max-width: 230px;">
+                    <button onclick="toggleConnectCameraSerial()" class="ref-btn ref-btn-accent" style="
+                      padding: 8px 12px;
+                      font-size: 11px;
+                      font-weight: 900;
+                      background-color: #2cff55;
+                      color: #0a0c10;
+                      border: 1px solid #2cff55;
+                      box-shadow: 0 0 12px rgba(44, 255, 85, 0.4);
+                      cursor: pointer;
+                    ">
+                      🔌 CONNECT ESP32-P4 (USB / COM)
+                    </button>
+                    <div style="display: flex; gap: 6px;">
+                      <button onclick="startSelectedCamera()" class="ref-btn" style="flex: 1; padding: 4px 6px; font-size: 9px; background-color: #2e342d;">SCAN WEBCAMS</button>
+                      <button onclick="reloadCameraStream()" class="ref-btn" style="flex: 1; padding: 4px 6px; font-size: 9px; background-color: #2e342d;">RETRY WIFI</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SIMULATED TARGET VIEW (CANVAS) -->
+              <div id="simTargetContainer" style="
+                width: 280px;
+                height: 280px;
+                background-color: #ffffff;
+                position: relative;
+                cursor: crosshair;
+                border: 1px solid #c8c2b5;
+                overflow: hidden;
+                display: none;
+              " onclick="handleTargetClick(event)">
+                <div id="targetFace" style="width: 100%; height: 100%; position: relative; transition: transform 0.28s ease, opacity 0.28s ease;">
+                  <svg viewBox="0 0 150 150" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none;">
+                    <rect x="2" y="2" width="146" height="146" fill="none" stroke="#242923" stroke-width="1.2" />
+                    <line x1="75" y1="0" x2="75" y2="150" stroke="#7a8277" stroke-width="0.5" stroke-dasharray="2 2" />
+                    <line x1="0" y1="75" x2="150" y2="75" stroke="#7a8277" stroke-width="0.5" stroke-dasharray="2 2" />
+                    <circle cx="75" cy="75" r="66" fill="none" stroke="#242923" stroke-width="1.0" />
+                    <circle cx="75" cy="75" r="50" fill="none" stroke="#242923" stroke-width="1.2" />
+                    <circle cx="75" cy="75" r="35" fill="none" stroke="#1a1e19" stroke-width="1.4" />
+                    <circle cx="75" cy="75" r="20" fill="none" stroke="#1a1e19" stroke-width="1.6" stroke-dasharray="3 1.5" />
+                    <circle cx="75" cy="75" r="3" fill="#1a1e19" />
+                    <line x1="70" y1="75" x2="80" y2="75" stroke="#ffffff" stroke-width="0.75" />
+                    <line x1="75" y1="70" x2="75" y2="80" stroke="#ffffff" stroke-width="0.75" />
+                    <rect x="50" y="50" width="50" height="50" fill="rgba(44, 89, 52, 0.08)" stroke="#2c5934" stroke-width="1.8" stroke-dasharray="4 2" />
+                  </svg>
+                  <div id="impactDotsContainer" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none;"></div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Bottom Action Buttons: Pop Target, Snapshot, Multi-Target Control -->
+            <div style="display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 320px;">
+              <div style="display: flex; gap: 6px;">
+                <button onclick="handlePopCommand(1, 5.0)" class="ref-btn ref-btn-accent" style="flex: 1; padding: 6px; font-size: 11px; font-weight: 800;" title="Shortcut: 0 - Pop Target 1 for 5 seconds">
+                  POP TARGET 1 (5s) [0]
+                </button>
+                <button onclick="takeCameraSnapshot()" class="ref-btn" style="flex: 1; padding: 6px; font-size: 10px; background-color: #384236;" title="Capture high-resolution still snapshot from camera">
+                  CAPTURE SNAPSHOT
+                </button>
+              </div>
+
+              <!-- Servo Pop Controller (Channels 1, 2, 3 + Drop All) -->
+              <div style="
+                background: #ffffff;
+                border: 1px solid var(--mil-border-light);
+                padding: 5px 8px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+              ">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 800; color: var(--text-dark);">
+                    SERVO POP CONTROLLER (COM7)
+                  </span>
+                  <span id="servoStatusBadge" style="font-family: var(--font-mono); font-size: 8px; font-weight: 800; color: var(--mil-hit);">
+                    READY
+                  </span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr) 1.2fr; gap: 4px;">
+                  <button onclick="toggleSingleServo(1)" id="btnServo1" class="ref-btn" style="padding: 4px 2px; font-size: 9px;" title="Toggle Target 1 (Channel 0)">
+                    T1 [TOGGLE]
+                  </button>
+                  <button onclick="toggleSingleServo(2)" id="btnServo2" class="ref-btn" style="padding: 4px 2px; font-size: 9px;" title="Toggle Target 2 (Channel 1)">
+                    T2 [TOGGLE]
+                  </button>
+                  <button onclick="toggleSingleServo(3)" id="btnServo3" class="ref-btn" style="padding: 4px 2px; font-size: 9px;" title="Toggle Target 3 (Channel 2)">
+                    T3 [TOGGLE]
+                  </button>
+                  <button onclick="sendPopServo('ALL_DOWN')" class="ref-btn" style="padding: 4px 2px; font-size: 9px; background-color: #5c1818;" title="Drop All 7 Targets (DOWN,ALL)">
+                    DROP ALL
+                  </button>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 9px;">
+                <span id="servoActivePosLabel" style="color: var(--text-muted);">Target 1: Concealed (DOWN)</span>
+                <button onclick="resetShots()" class="ref-btn" style="padding: 2px 8px; font-size: 9px; background-color: #353d33;">CLEAR SHOTS</button>
+              </div>
+            </div>
+
+            <!-- Last Impact Verdict -->
+            <div style="
+              width: 100%;
+              max-width: 320px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              background-color: #ffffff;
+              border: 1px solid var(--mil-border-light);
+              padding: 5px 8px;
+            ">
+              <div>
+                <div style="font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700;">
+                  LAST ENGAGEMENT VERDICT
+                </div>
+                <div id="verdictLabel" style="font-size: 10px; font-weight: 800; color: var(--text-dark); margin-top: 1px;">
+                  STANDBY // ENGAGE TARGET
+                </div>
+              </div>
+              <span id="verdictBadge" style="
+                font-family: var(--font-mono);
+                font-size: 9px;
+                font-weight: 800;
+                padding: 2px 6px;
+                background-color: var(--mil-canvas-tint);
+                color: var(--text-dark);
+                border: 1px solid var(--mil-border-light);
+              ">
+                READY
+              </span>
+            </div>
+
+            <!-- TACTICAL CV DEBUG INSPECTOR PANEL -->
+            <div id="cvDebugInspectorPanel" style="
+              width: 100%;
+              max-width: 320px;
+              background-color: #1a1e19;
+              border: 1px solid #3d463b;
+              box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+              padding: 8px;
+              margin-top: 6px;
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              font-family: var(--font-mono);
+            ">
+              <!-- Header with live system state -->
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2b302a; padding-bottom: 4px;">
+                <span style="font-size: 9px; font-weight: 800; color: #2cff55; letter-spacing: 0.5px;">
+                  🔬 CV EVENT INSPECTOR
+                </span>
+                <span id="cvStateBadge" style="
+                  font-size: 8.5px;
+                  font-weight: 800;
+                  padding: 2px 6px;
+                  background-color: #2b302a;
+                  color: #ffcc00;
+                  border: 1px solid #4a5445;
+                  border-radius: 2px;
+                ">
+                  IDLE (DOWN)
+                </span>
+              </div>
+
+              <!-- 4-Channel Visual Evidence Canvases -->
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <span style="font-size: 7px; color: #8c9688; font-weight: 700;">LIVE ROI</span>
+                  <canvas id="canvasLiveRoi" width="70" height="70" style="width: 100%; aspect-ratio: 1/1; background: #000; border: 1px solid #3d463b; border-radius: 2px;"></canvas>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <span style="font-size: 7px; color: #8c9688; font-weight: 700;">REFERENCE</span>
+                  <canvas id="canvasBaseline" width="70" height="70" style="width: 100%; aspect-ratio: 1/1; background: #000; border: 1px solid #3d463b; border-radius: 2px;"></canvas>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <span style="font-size: 7px; color: #8c9688; font-weight: 700;">DIFF HEATMAP</span>
+                  <canvas id="canvasDiffMap" width="70" height="70" style="width: 100%; aspect-ratio: 1/1; background: #000; border: 1px solid #3d463b; border-radius: 2px;"></canvas>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <span style="font-size: 7px; color: #8c9688; font-weight: 700;">ORANGE/DART</span>
+                  <canvas id="canvasColorMask" width="70" height="70" style="width: 100%; aspect-ratio: 1/1; background: #000; border: 1px solid #3d463b; border-radius: 2px;"></canvas>
+                </div>
+              </div>
+
+              <!-- 4-Check Verification Matrix -->
+              <div style="background: #111410; border: 1px solid #282f25; padding: 4px 6px; display: flex; flex-direction: column; gap: 3px; font-size: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #a0aba0;">1. Diff vs Baseline:</span>
+                  <span id="cvCheck1Badge" style="color: #888; font-weight: 700;">0 px (0%)</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #a0aba0;">2. Orange/Yellow Spectrum:</span>
+                  <span id="cvCheck2Badge" style="color: #888; font-weight: 700;">0 px (0%)</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #a0aba0;">3. Sudden Onset Jump:</span>
+                  <span id="cvCheck3Badge" style="color: #888; font-weight: 700;">0.0</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #a0aba0;">4. Spatial Cluster Density:</span>
+                  <span id="cvCheck4Badge" style="color: #888; font-weight: 700;">0%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #222920; padding-top: 2px;">
+                  <span style="color: #2cff55; font-weight: 800;">Detection Latency:</span>
+                  <span id="cvLatencyBadge" style="color: #2cff55; font-weight: 800;">-- ms</span>
+                </div>
+              </div>
+
+              <!-- Real-time Diagnostics Reason & Action Row -->
+              <div id="cvDebugReason" style="font-size: 7.5px; color: #8c9688; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                Ready. Press '0' or POP TARGET to arm event detector.
+              </div>
+
+              <!-- Quick Tuning & Diagnostic Controls -->
+              <div style="display: flex; gap: 4px;">
+                <button onclick="calibrateTargetBaselineNow()" class="ref-btn" style="flex: 1; padding: 3px; font-size: 8px;" title="Manually re-capture clean black target baseline">
+                  📸 RE-BASELINE
+                </button>
+                <button onclick="testForceSimulateHit()" class="ref-btn" style="flex: 1; padding: 3px; font-size: 8px; background-color: #3b2a1a; color: #ffcc00;" title="Test physical servo reverse without shooting">
+                  ⚡ TEST SERVO
+                </button>
+                <button onclick="toggleCvSettingsModal()" class="ref-btn" style="padding: 3px 6px; font-size: 8px;" title="Adjust thresholds and sensitivity">
+                  ⚙️ TUNING
+                </button>
+              </div>
+
+              <!-- Collapsible Tuning Drawer -->
+              <div id="cvTuningDrawer" style="display: none; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 1px dashed #3d463b; font-size: 7.5px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>Diff Sensitivity (Threshold): <b id="valDiffThresh">28</b></span>
+                  <input type="range" min="15" max="50" value="28" step="1" oninput="updateCvThresholds('diff', this.value)" style="width: 90px; height: 3px;" />
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>Nerf Dart Min Px: <b id="valColorThresh">50</b></span>
+                  <input type="range" min="20" max="150" value="50" step="5" oninput="updateCvThresholds('color', this.value)" style="width: 90px; height: 3px;" />
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>Servo Settle Time: <b id="valSettleMs">1800ms</b></span>
+                  <input type="range" min="500" max="3000" value="1800" step="100" oninput="updateCvThresholds('settle', this.value)" style="width: 90px; height: 3px;" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Command Deck, Arrow Buttons & Rail Visualizer -->
+      <div style="
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 0;
+        height: 100%;
+      ">
+        <!-- Command Deck & Rail Card -->
+        <div style="flex: 1 1 70%; min-height: 0;">
+          <div class="ref-panel" style="display: flex; flex-direction: column; height: 100%; padding: 10px 12px;">
+            <!-- 3 HERO COMMAND TILES -->
+            <div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                <!-- TILE 1: [R] RETURN TO ORIGIN -->
+                <button id="tileReset" onclick="driveToHome()" class="ref-cmd-tile" title="Shortcut: R - Return carriage to 0.00m Origin where it started">
+                  <div class="ref-tile-key">R</div>
+                  <div class="ref-tile-title">RETURN TO ORIGIN</div>
+                  <div class="ref-tile-sub">RETURN HOME (0.0m) [R]</div>
+                </button>
+
+                <!-- TILE 2: [S] START / STOP TARGET -->
+                <button id="tileStartStop" onclick="toggleStartStop()" class="ref-cmd-tile active-run" title="Shortcut: S or Spacebar - Toggle Start and Stop motion">
+                  <div class="ref-tile-key">S</div>
+                  <div class="ref-tile-title" id="tileStartStopTitle">START TARGET</div>
+                  <div class="ref-tile-sub" id="tileStartStopSub">TO STOP POINT (1.50m) [S]</div>
+                </button>
+
+                <!-- TILE 3: [0] POP TARGET -->
+                <button id="tilePop" onclick="handlePopCommand()" class="ref-cmd-tile" title="Shortcut: 0 - 5s exposure">
+                  <div class="ref-tile-key">0</div>
+                  <div class="ref-tile-title" id="tilePopTitle">POP TARGET (5s)</div>
+                  <div class="ref-tile-sub" id="tilePopSub">SERVO FOLDED</div>
+                </button>
+              </div>
+
+              <!-- CONTINUOUS ARROW DRIVE & SHUTTLE BUTTONS -->
+              <div style="display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 6px; margin-top: 6px;">
+                <!-- Left Arrow Button -->
+                <button id="btnArrowLeft" onclick="driveToHome()" class="ref-btn" style="padding: 7px 4px; display: flex; align-items: center; justify-content: center; gap: 6px;" title="Keyboard Left Arrow [←] - Runs carriage back toward 0.00m">
+                  <span style="font-size: 15px; font-weight: 900; color: #ffcc00;">◄</span>
+                  <span style="font-size: 10px; font-weight: 800;">DRIVE TO 0.0m [←]</span>
+                </button>
+
+                <!-- Continuous Shuttle Toggle Button -->
+                <button id="btnAutoShuttle" onclick="toggleContinuousShuttle()" class="ref-btn" style="padding: 7px 4px; display: flex; align-items: center; justify-content: center; gap: 6px; background-color: #2b332b;" title="Keyboard Up/Down Arrow [↑/↓] - Loops back and forth continuously">
+                  <span style="font-size: 13px; color: #77ff88;">◄►</span>
+                  <span id="shuttleBtnText" style="font-size: 10px; font-weight: 800;">AUTO SHUTTLE [↑/↓]</span>
+                </button>
+
+                <!-- Right Arrow Button -->
+                <button id="btnArrowRight" onclick="driveToStopPoint()" class="ref-btn" style="padding: 7px 4px; display: flex; align-items: center; justify-content: center; gap: 6px;" title="Keyboard Right Arrow [→] - Runs carriage forward toward Stop Point">
+                  <span style="font-size: 10px; font-weight: 800;">DRIVE TO STOP [→]</span>
+                  <span style="font-size: 15px; font-weight: 900; color: #ffcc00;">►</span>
+                </button>
+              </div>
+
+              <!-- Full-Width ESTOP Button -->
+              <button
+                id="btnEstop"
+                onclick="handleEmergencyStop()"
+                class="ref-btn"
+                style="
+                  width: 100%;
+                  margin-top: 6px;
+                  background-color: #2e342d;
+                  padding: 6px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 8px;
+                "
+                title="Global shortcut: ESC"
+              >
+                <span style="font-weight: 900; font-size: 12px; color: #ff7777;">[ESC]</span>
+                <span style="font-size: 11px;">EMERGENCY STOP // HALT CARRIAGE</span>
+              </button>
+
+              <!-- DYNAMIC MOTOR SPEED SELECTOR -->
+              <div style="
+                margin-top: 6px;
+                background-color: #ffffff;
+                border: 1px solid var(--mil-border-light);
+                padding: 5px 8px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+              ">
+                <div style="font-family: var(--font-mono); font-size: 10px; font-weight: 800; color: var(--text-dark); white-space: nowrap;">
+                  MOTOR SPEED: <span id="speedValueLabel" style="color: var(--mil-hit); font-size: 11px;">100%</span>
+                  <span id="speedMetricLabel" style="color: var(--text-muted); font-size: 9px; font-weight: 600;">(~24.4 cm/s)</span>
+                </div>
+
+                <input
+                  id="speedSlider"
+                  type="range"
+                  min="15"
+                  max="140"
+                  value="100"
+                  step="5"
+                  oninput="onSpeedSliderChange(this.value)"
+                  style="flex: 1; accent-color: var(--mil-hit); cursor: pointer; height: 5px;"
+                  title="Adjust motor speed percentage"
+                />
+
+                <div style="display: flex; gap: 3px;">
+                  <button onclick="setSpeed(30)" class="ref-btn speed-preset-btn" id="btnSpeed30" style="padding: 2px 5px; font-size: 9px;">30%</button>
+                  <button onclick="setSpeed(60)" class="ref-btn speed-preset-btn" id="btnSpeed60" style="padding: 2px 5px; font-size: 9px;">60%</button>
+                  <button onclick="setSpeed(100)" class="ref-btn speed-preset-btn ref-btn-accent" id="btnSpeed100" style="padding: 2px 5px; font-size: 9px;">100%</button>
+                  <button onclick="setSpeed(130)" class="ref-btn speed-preset-btn" id="btnSpeed130" style="padding: 2px 5px; font-size: 9px;">130%</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- CONTINUOUS DISTANCE & RAIL TRACK -->
+            <div style="
+              margin-top: 6px;
+              background-color: #ffffff;
+              border: 1px solid var(--mil-border-light);
+              padding: 8px 12px;
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+            ">
+              <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                  <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.08em;">
+                    TARGET POSITION // 0.000m ZERO ORIGIN
+                  </div>
+                  <div style="
+                    font-family: var(--font-mono);
+                    font-size: 28px;
+                    font-weight: 900;
+                    color: var(--text-dark);
+                    letter-spacing: 0.02em;
+                    line-height: 1.0;
+                    margin-top: 2px;
+                  ">
+                    <span id="displayDistanceMeters">0.000</span> <span style="font-size: 15px; font-weight: 700; color: var(--text-muted);">m</span>
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-left: 6px;">(<span id="displayDistanceCm">0.0</span> cm | <span id="displayStepCount">0</span> steps)</span>
+                  </div>
+                </div>
+
+                <div style="text-align: right;">
+                  <div style="font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700;">
+                    CARRIAGE STATE
+                  </div>
+                  <div id="displayCarriageStatus" style="
+                    font-family: var(--font-mono);
+                    font-size: 10px;
+                    font-weight: 800;
+                    color: var(--mil-dark);
+                    margin-top: 2px;
+                    background-color: var(--mil-canvas-tint);
+                    padding: 2px 6px;
+                    border: 1px solid var(--mil-border-light);
+                  ">
+                    STOPPED // UP
+                  </div>
+                </div>
+              </div>
+
+              <!-- Precision 1.74m Rail Track with Interactive Stop Point Flag -->
+              <div>
+                <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 9px;
+                  font-family: var(--font-mono);
+                  font-weight: 800;
+                  color: var(--text-muted);
+                  margin-bottom: 3px;
+                ">
+                  <span>[SHOOTER] 0.00 m</span>
+                  <span style="color: #9e2a2b;">FLAG: STOP AT <b id="railStopPointLabel">1.50m</b></span>
+                  <span>1.74 m [MAX LIMIT]</span>
+                </div>
+
+                <div id="railTrackContainer" onclick="handleRailTrackClick(event)" style="
+                  position: relative;
+                  height: 40px;
+                  background-color: var(--mil-card-bg);
+                  border: 1px solid var(--mil-border-light);
+                  display: flex;
+                  align-items: center;
+                  cursor: pointer;
+                " title="Click anywhere on the track to set the target stop point">
+                  <!-- Metric Milestones (0.4m, 0.87m, 1.3m, 1.74m) -->
+                  <div style="position: absolute; left: 23%; height: 100%; width: 1px; background-color: var(--mil-border-light); pointer-events: none;">
+                    <span style="position: absolute; top: 2px; left: 3px; font-size: 8px; font-family: var(--font-mono); color: var(--text-muted);">0.40m</span>
+                  </div>
+                  <div style="position: absolute; left: 50%; height: 100%; width: 1px; background-color: var(--mil-border-light); pointer-events: none;">
+                    <span style="position: absolute; top: 2px; left: 3px; font-size: 8px; font-family: var(--font-mono); color: var(--text-muted);">0.87m (Mid)</span>
+                  </div>
+                  <div style="position: absolute; left: 74.7%; height: 100%; width: 1px; background-color: var(--mil-border-light); pointer-events: none;">
+                    <span style="position: absolute; top: 2px; left: 3px; font-size: 8px; font-family: var(--font-mono); color: var(--text-muted);">1.30m</span>
+                  </div>
+
+                  <!-- Guide Rail -->
+                  <div style="
+                    position: absolute;
+                    top: 18px;
+                    left: 6px;
+                    right: 6px;
+                    height: 4px;
+                    background-color: #353c34;
+                    pointer-events: none;
+                  "></div>
+
+                  <!-- Configured STOP POINT Marker / Boundary Flag -->
+                  <div id="stopPointMarker" class="stop-marker-transition" style="
+                    position: absolute;
+                    left: 86.2%;
+                    top: 0;
+                    bottom: 0;
+                    width: 2px;
+                    background-color: #8a2a2a;
+                    transform: translateX(-50%);
+                    z-index: 5;
+                    pointer-events: none;
+                  ">
+                    <div style="
+                      position: absolute;
+                      top: 1px;
+                      right: 4px;
+                      background-color: #8a2a2a;
+                      color: #ffffff;
+                      font-family: var(--font-mono);
+                      font-size: 8px;
+                      font-weight: 900;
+                      padding: 1px 3px;
+                      white-space: nowrap;
+                      border-radius: 2px;
+                      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                    ">
+                      STOP ▼
+                    </div>
+                  </div>
+
+                  <!-- Target Carriage Marker -->
+                  <div id="railCarriageMarker" class="carriage-marker" style="
+                    position: absolute;
+                    left: 0%;
+                    transform: translateX(-50%);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    z-index: 10;
+                    pointer-events: none;
+                  ">
+                    <div style="
+                      width: 20px;
+                      height: 20px;
+                      background-color: var(--mil-hit);
+                      border: 2px solid #ffffff;
+                      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    ">
+                      <div style="width: 5px; height: 5px; background-color: #ffffff;"></div>
+                    </div>
+                    <div id="carriageTag" style="
+                      font-size: 9px;
+                      font-family: var(--font-mono);
+                      font-weight: 900;
+                      color: #ffffff;
+                      background-color: var(--mil-dark);
+                      padding: 1px 4px;
+                      margin-top: 1px;
+                      white-space: nowrap;
+                    ">
+                      0.00m
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CHOOSE TARGET STOP POINT CONTROLS -->
+              <div style="
+                background-color: var(--mil-card-bg);
+                border: 1px solid var(--mil-border-light);
+                padding: 6px 8px;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+              ">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 10px; font-family: var(--font-mono); font-weight: 900; color: #8a2a2a; text-transform: uppercase;">
+                      ★ CHOOSE STOP POINT:
+                    </span>
+                    <input id="inputStopPoint" type="number" step="0.05" min="0.05" max="1.74" value="1.50" onchange="onStopPointInputChange(this.value)" style="width: 62px; padding: 2px 4px; font-family: var(--font-mono); font-weight: 900; font-size: 11px; border: 1px solid var(--mil-border-light); text-align: center;" />
+                    <span style="font-size: 10px; font-family: var(--font-mono); font-weight: 700; color: var(--text-dark);">m</span>
+                    <span style="font-size: 9px; font-family: var(--font-mono); color: var(--text-muted); margin-left: 2px;">(<span id="stopPointCmText">150.0</span> cm | <span id="stopPointStepsText">5,000</span> steps)</span>
+                  </div>
+
+                  <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-muted);">
+                    Remaining: <b id="distanceRemainingLabel" style="color: var(--text-dark);">1.500 m</b>
+                  </div>
+                </div>
+
+                <!-- Slider & Quick Stop Point Presets -->
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <input id="sliderStopPoint" type="range" min="0.05" max="1.74" step="0.01" value="1.50" oninput="onStopPointSliderChange(this.value)" style="flex: 1; accent-color: #8a2a2a; cursor: pointer;" />
+
+                  <!-- Quick Stop Presets -->
+                  <div style="display: flex; gap: 3px;">
+                    <button onclick="setStopPoint(0.50)" class="ref-btn ref-btn-light" style="padding: 2px 5px; font-size: 9px;">0.5m</button>
+                    <button onclick="setStopPoint(1.00)" class="ref-btn ref-btn-light" style="padding: 2px 5px; font-size: 9px;">1.0m</button>
+                    <button onclick="setStopPoint(1.20)" class="ref-btn ref-btn-light" style="padding: 2px 5px; font-size: 9px;">1.2m</button>
+                    <button onclick="setStopPoint(1.50)" class="ref-btn ref-btn-light" style="padding: 2px 5px; font-size: 9px;">1.5m</button>
+                    <button onclick="setStopPoint(1.74)" class="ref-btn ref-btn-light" style="padding: 2px 5px; font-size: 9px; font-weight: 900; color: #8a2a2a;">1.74m</button>
+                    <button onclick="sendZeroCommand()" class="ref-btn" style="padding: 2px 5px; font-size: 9px; background-color: #736245;">ZERO</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom: Clean Recent Impact Stream -->
+        <div style="flex: 1 1 30%; min-height: 100px;">
+          <div class="ref-panel" style="
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 8px 10px;
+          ">
+            <div style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              padding-bottom: 4px;
+              border-bottom: 1px solid var(--mil-border-light);
+              margin-bottom: 4px;
+            ">
+              <div style="
+                font-family: var(--font-mono);
+                font-size: 10px;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+                color: var(--text-dark);
+                text-transform: uppercase;
+              ">
+                RECENT IMPACT LOG
+              </div>
+              <span id="logCounter" style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono);">
+                0 OF 20 RECORDED
+              </span>
+            </div>
+
+            <div id="impactLogContainer" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 3px;">
+              <div id="emptyLogNotice" style="
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--text-muted);
+                font-family: var(--font-mono);
+                font-size: 10px;
+                font-style: italic;
+                text-align: center;
+                padding: 8px;
+              ">
+                NO SHOTS LOGGED // CLICK TARGET TO RECORD IMPACT
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Terminal Drawer Modal -->
+  <div id="terminalModal" style="
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 240px;
+    background-color: #171a16;
+    border-top: 2px solid #353c34;
+    padding: 12px 20px;
+    z-index: 100;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+    flex-direction: column;
+  ">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 800; color: #ffffff;">
+        ESP32 SERIAL COMMUNICATION LOG (115200 BAUD) — 1.74m RAIL
+      </span>
+      <div style="display: flex; gap: 6px;">
+        <button onclick="sendZeroCommand()" class="ref-btn" style="padding: 2px 8px; font-size: 10px;" title="Calibrate / Set current position as 0.00m Coordinate Origin">SET ZERO COORD</button>
+        <button onclick="sendRawCommand('STATUS')" class="ref-btn" style="padding: 2px 8px; font-size: 10px;">QUERY STATUS</button>
+        <button onclick="clearTerminal()" class="ref-btn" style="padding: 2px 8px; font-size: 10px;">CLEAR</button>
+        <button onclick="toggleTerminalModal()" class="ref-btn ref-btn-light" style="padding: 2px 8px; font-size: 10px;">CLOSE [X]</button>
+      </div>
+    </div>
+    <div id="terminalOutput" style="
+      flex: 1;
+      background-color: #0d0f0c;
+      border: 1px solid #282d26;
+      padding: 8px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #9fe29e;
+    "></div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // CALIBRATION & HARDWARE SETTINGS (GT2 30T PULLEY = 6.0 CM / REV)
+    // =========================================================================
+    const CM_PER_REV   = 6.0;               // 30 teeth × 2mm = 60mm = 6.0 cm per revolution
+    const STEPS_PER_CM = 200.0 / CM_PER_REV; // 33.3333 steps/cm (5,000 steps = 1.50m = 150 cm)
+    const MAX_METERS   = 1.74;              // 1.74 meters (174.0 cm) total rail length
+    const MIN_METERS   = 0.00;
+
+    let currentDistanceMeters = 0.0;
+    let chosenStopPointMeters = 1.50;    // User-selectable stop point (default 1.50m)
+    let currentStepCount      = 0;
+    let isMoving              = false;
+    let isEmergencyStop       = false;
+    let elevationState        = 'UP';
+    let exposureSeconds       = 5.0;
+    let exposureTimer         = null;
+
+    // Continuous Shuttle State
+    let isShuttleActive       = false;
+    let shuttleTargetMeters   = 1.50;
+    let shuttleDwellTimer     = null;
+
+    // Web Serial State
+    let port        = null;
+    let reader      = null;
+    let isConnected = false;
+
+    // Motor Speed Level (15% to 150%)
+    let motorSpeedPercent = 100;
+
+    // Session Shots
+    let shots = [];
+
+    // --- KEYBOARD CONTROLS (ARROWS, R, S, 0, SPACE, ESC, 1-4 SPEED) ---
+    window.addEventListener('keydown', (e) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+
+      const key = e.key;
+
+      if (key === 'ArrowRight') {
+        e.preventDefault();
+        driveToStopPoint();
+      } else if (key === 'ArrowLeft') {
+        e.preventDefault();
+        driveToHome();
+      } else if (key === 'ArrowUp' || key === 'ArrowDown') {
+        e.preventDefault();
+        toggleContinuousShuttle();
+      } else if (key === ' ' || key.toUpperCase() === 'S') {
+        e.preventDefault();
+        toggleStartStop();
+      } else if (key.toUpperCase() === 'R') {
+        e.preventDefault();
+        driveToHome();
+      } else if (key === 'Escape') {
+        e.preventDefault();
+        handleEmergencyStop();
+      } else if (key === '0') {
+        e.preventDefault();
+        handlePopCommand();
+      } else if (key === '1') {
+        e.preventDefault();
+        setSpeed(30);
+      } else if (key === '2') {
+        e.preventDefault();
+        setSpeed(60);
+      } else if (key === '3') {
+        e.preventDefault();
+        setSpeed(100);
+      } else if (key === '4') {
+        e.preventDefault();
+        setSpeed(130);
+      } else if (key === '+' || key === '=') {
+        e.preventDefault();
+        setSpeed(motorSpeedPercent + 10);
+      } else if (key === '-' || key === '_') {
+        e.preventDefault();
+        setSpeed(motorSpeedPercent - 10);
+      }
+    });
+
+    // --- MOTOR SPEED CONTROLLER ---
+    function setSpeed(pct) {
+      motorSpeedPercent = Math.max(15, Math.min(150, parseInt(pct, 10)));
+      
+      const slider = document.getElementById("speedSlider");
+      if (slider) slider.value = motorSpeedPercent;
+      
+      const valLabel = document.getElementById("speedValueLabel");
+      if (valLabel) valLabel.innerText = `${motorSpeedPercent}%`;
+      
+      const metricLabel = document.getElementById("speedMetricLabel");
+      if (metricLabel) {
+        let cmPerSec = 24.4 * (motorSpeedPercent / 100.0);
+        metricLabel.innerText = `(~${cmPerSec.toFixed(1)} cm/s)`;
+      }
+
+      // Highlight active preset button if matched
+      document.querySelectorAll(".speed-preset-btn").forEach(btn => btn.classList.remove("ref-btn-accent"));
+      const activeBtn = document.getElementById(`btnSpeed${motorSpeedPercent}`);
+      if (activeBtn) activeBtn.classList.add("ref-btn-accent");
+
+      // Send SPEED command to hardware
+      sendRawCommand(`SPEED,${motorSpeedPercent}`);
+      logTerm(`[Speed] Commanded Motor Speed: ${motorSpeedPercent}% (~${(24.4 * motorSpeedPercent / 100).toFixed(1)} cm/s)`);
+    }
+
+    function onSpeedSliderChange(val) {
+      setSpeed(val);
+    }
+
+    // --- CONTINUOUS ARROW & SHUTTLE DRIVE ---
+    function driveToStopPoint() {
+      if (isEmergencyStop) return;
+      stopShuttleLoop();
+      let cm = chosenStopPointMeters * 100.0;
+      sendRawCommand(`TARGET,${cm.toFixed(1)}`);
+      logTerm(`[Arrow ►] Driving forward to Stop Point: ${chosenStopPointMeters.toFixed(2)}m (${cm.toFixed(1)} cm)`);
+    }
+
+    function driveToHome() {
+      if (isEmergencyStop) return;
+      stopShuttleLoop();
+      sendRawCommand("TARGET,0.0");
+      logTerm("[Origin ◄ / R] Returning carriage back to Origin: 0.00m (0.0 cm)");
+    }
+
+    function toggleContinuousShuttle() {
+      if (isEmergencyStop) return;
+      isShuttleActive = !isShuttleActive;
+
+      const btn = document.getElementById("btnAutoShuttle");
+      const text = document.getElementById("shuttleBtnText");
+
+      if (isShuttleActive) {
+        btn.classList.add("ref-btn-shuttle-active");
+        text.innerText = "SHUTTLE RUNNING [HALT]";
+        logTerm(`[Shuttle] Continuous Patrol Started between 0.00m and ${chosenStopPointMeters.toFixed(2)}m`);
+        runShuttleCycle();
+      } else {
+        stopShuttleLoop();
+      }
+    }
+
+    function stopShuttleLoop() {
+      if (!isShuttleActive) return;
+      isShuttleActive = false;
+      clearTimeout(shuttleDwellTimer);
+
+      const btn = document.getElementById("btnAutoShuttle");
+      const text = document.getElementById("shuttleBtnText");
+      btn.classList.remove("ref-btn-shuttle-active");
+      text.innerText = "AUTO SHUTTLE [↑/↓]";
+      logTerm("[Shuttle] Continuous Patrol Paused.");
+    }
+
+    function runShuttleCycle() {
+      if (!isShuttleActive || isEmergencyStop) return;
+
+      // Determine next shuttle destination
+      let atHome = currentDistanceMeters < 0.05;
+      let targetM = atHome ? chosenStopPointMeters : 0.00;
+
+      let cm = targetM * 100.0;
+      sendRawCommand(`TARGET,${cm.toFixed(1)}`);
+      logTerm(`[Shuttle Cycle] Heading to ${targetM.toFixed(2)}m...`);
+    }
+
+    function onArrivalAtTarget() {
+      if (isShuttleActive) {
+        // Arrived at one end of the shuttle run -> dwell 1 second then reverse
+        clearTimeout(shuttleDwellTimer);
+        shuttleDwellTimer = setTimeout(() => {
+          if (isShuttleActive) runShuttleCycle();
+        }, 1000);
+      }
+    }
+
+    // --- WEB SERIAL COMMUNICATION ---
+    async function toggleConnectSerial() {
+      if (isConnected) {
+        await disconnectSerial();
+      } else {
+        await connectSerial();
+      }
+    }
+
+    async function connectSerial() {
+      if (!("serial" in navigator)) {
+        alert("Web Serial API is not supported in this browser. Please open in Google Chrome or Microsoft Edge.");
+        return;
+      }
+
+      try {
+        logTerm("[Serial] Requesting ESP32 port...");
+        const paired = await navigator.serial.getPorts();
+        if (paired.length > 0 && !port) {
+          port = paired[0];
+        } else {
+          port = await navigator.serial.requestPort();
+        }
+
+        await port.open({ baudRate: 115200 });
+
+        try {
+          await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+        } catch (e) {}
+
+        isConnected = true;
+        updateConnectionUI(true);
+        logTerm("[Serial] Connected to ESP32 at 115200 baud! Motor halted [IDLE].");
+
+        readSerialLoop();
+        // Immediately enforce STOP on connection to prevent any residual motor movement
+        setTimeout(() => sendRawCommand("STOP"), 80);
+        setTimeout(() => sendRawCommand("STATUS"), 400);
+        setTimeout(() => sendRawCommand(`SPEED,${motorSpeedPercent}`), 550);
+
+      } catch (err) {
+        console.error("Connection error:", err);
+        let msg = err.message || err.toString();
+        if (msg.includes("Failed to open") || err.name === "NetworkError") {
+          logTerm("[ERROR] COM port locked! Ensure Arduino IDE Serial Monitor is CLOSED.");
+          alert("Connection Failed: The COM port is locked!\n\nPlease CLOSE the Arduino IDE Serial Monitor, then click Connect again.");
+        } else {
+          logTerm(`[Serial] Cancelled or failed: ${msg}`);
+        }
+        port = null;
+        isConnected = false;
+        updateConnectionUI(false);
+      }
+    }
+
+    // Safety: halt carriage motion immediately if user clicks outside browser or switches tabs
+    window.addEventListener('blur', () => {
+      if (isMoving || isShuttleActive) {
+        handleEmergencyStop();
+        logTerm("[Safety] Window lost focus: Carriage halted automatically.");
+      }
+    });
+
+    async function disconnectSerial() {
+      isConnected = false;
+      stopShuttleLoop();
+      try {
+        if (reader) {
+          await reader.cancel();
+          reader.releaseLock();
+          reader = null;
+        }
+        if (port) {
+          await port.close();
+          port = null;
+        }
+      } catch (e) {}
+      updateConnectionUI(false);
+      logTerm("[Serial] Disconnected.");
+    }
+
+    function updateConnectionUI(connected) {
+      const dot  = document.getElementById("serialStatusDot");
+      const text = document.getElementById("serialStatusText");
+      const btn  = document.getElementById("btnConnectSerial");
+      const sub  = document.getElementById("subbarNotice");
+
+      if (connected) {
+        dot.style.backgroundColor = "#2cff55";
+        text.innerText = "ESP32 CONNECTED";
+        btn.style.backgroundColor = "#1b3a20";
+        sub.innerText = "HARDWARE LINKED // USE ARROW BUTTONS [←] [→] TO DRIVE CARRIAGE";
+      } else {
+        dot.style.backgroundColor = "#ffcc00";
+        text.innerText = "CONNECT ESP32";
+        btn.style.backgroundColor = "#2c5934";
+        sub.innerText = "USE KEYBOARD ARROWS [←] [→] TO RUN CARRIAGE CONTINUOUSLY";
+      }
+    }
+
+    async function readSerialLoop() {
+      let buffer = "";
+      const decoder = new TextDecoder();
+
+      try {
+        reader = port.readable.getReader();
+        while (isConnected && port && port.readable) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) {
+            buffer += decoder.decode(value, { stream: true });
+            let lines = buffer.split("\n");
+            buffer = lines.pop();
+
+            for (let line of lines) {
+              handleIncomingSerial(line.trim());
+            }
+          }
+        }
+      } catch (err) {
+        if (isConnected) logTerm(`[Serial Error] ${err.message}`);
+      } finally {
+        if (reader) {
+          try { reader.releaseLock(); } catch(e){}
+          reader = null;
+        }
+      }
+    }
+
+    function handleIncomingSerial(line) {
+      if (!line) return;
+      logTerm(`◄ ${line}`);
+
+      // Distance matching from ESP32: "Distance from Zero: 150.00 cm" or "Position: 150.00 cm"
+      let posMatch = line.match(/(?:Distance from Zero:\s*|Position:\s*|Current position:\s*)([0-9.]+)\s*cm/i);
+      if (posMatch) {
+        let cm = parseFloat(posMatch[1]);
+        updateCarriagePosition(cm / 100.0);
+        setMotionState(false);
+      }
+
+      // Step count matching: "(5000 steps)"
+      let stepsMatch = line.match(/\(([0-9]+)\s*steps\)/i);
+      if (stepsMatch) {
+        currentStepCount = parseInt(stepsMatch[1], 10);
+        document.getElementById("displayStepCount").innerText = currentStepCount.toLocaleString();
+      }
+
+      // Moving announcement: "Moving from 0.00 cm -> 150.00 cm"
+      if (line.includes("Moving from")) {
+        setMotionState(true);
+      }
+
+      // Parse servo confirmations from pop.ino (UP_CONFIRMED,<id> or DOWN_CONFIRMED,<id|ALL>)
+      if (line.includes("UP_CONFIRMED")) {
+        const parts = line.split(",");
+        const id = parts[1] ? parts[1].trim() : "1";
+        logTerm(`[ESP32 Confirmed] Target ${id} raised (UP_CONFIRMED)`);
+        const badge = document.getElementById("servoStatusBadge");
+        if (badge) {
+          badge.innerText = `T${id} CONFIRMED UP`;
+          badge.style.color = "var(--mil-hit)";
+        }
+      } else if (line.includes("DOWN_CONFIRMED")) {
+        logTerm(`[ESP32 Confirmed] Targets lowered (${line})`);
+        const badge = document.getElementById("servoStatusBadge");
+        if (badge) {
+          badge.innerText = `CONCEALED [DOWN]`;
+          badge.style.color = "var(--text-muted)";
+        }
+      } else if (line.includes("STATUS: READY")) {
+        logTerm("[ESP32] Servo Target Controller Ready (PCA9685 online).");
+        const badge = document.getElementById("servoStatusBadge");
+        if (badge) {
+          badge.innerText = "SERVO READY";
+          badge.style.color = "var(--mil-hit)";
+        }
+      }
+
+      if (line.includes("Movement complete") || line.includes("Already at target")) {
+        setMotionState(false);
+        onArrivalAtTarget();
+      }
+    }
+
+    async function sendRawCommand(cmd) {
+      logTerm(`► ${cmd}`);
+
+      // 1. Send over USB UART if Motor / Rail ESP32 is connected via Serial
+      if (isConnected && port && port.writable) {
+        try {
+          const encoder = new TextEncoder();
+          const writer = port.writable.getWriter();
+          await writer.write(encoder.encode(cmd + "\n"));
+          writer.releaseLock();
+        } catch (e) {
+          logTerm(`[Write Error] ${e.message}`);
+        }
+      }
+
+      // 2. ALWAYS ALSO send Pop-Up Target commands (UP, DOWN, etc.) over Wi-Fi to Pop-Up ESP32 (http://192.168.4.1)
+      //    even when Motor UART is connected!
+      const isPopTargetCmd = cmd.startsWith("UP") || cmd.startsWith("DOWN") || cmd === "PING" || cmd === "STATUS";
+      if (isPopTargetCmd || !isConnected) {
+        const input = document.getElementById("cameraStreamUrlInput");
+        let wifiBaseUrl = input ? input.value.trim() : "http://192.168.4.1/";
+        if (!wifiBaseUrl.startsWith("http")) wifiBaseUrl = "http://" + wifiBaseUrl;
+        wifiBaseUrl = wifiBaseUrl.replace(/\/+$/, "");
+
+        try {
+          fetch(`${wifiBaseUrl}/cmd?action=${encodeURIComponent(cmd)}`, { method: "POST", mode: "no-cors" }).catch(() => {});
+          logTerm(`[WiFi Target] Dispatched '${cmd}' wirelessly to Pop-Up ESP32 at ${wifiBaseUrl}`);
+        } catch (e) {}
+      }
+
+      // 3. ALSO send commands through Camera USB Serial (COM17) if connected, allowing 1-cable camera setups to relay commands
+      if (isCameraSerialConnected && cameraPort && cameraPort.writable) {
+        try {
+          const encoder = new TextEncoder();
+          const writer = cameraPort.writable.getWriter();
+          await writer.write(encoder.encode(cmd + "\n"));
+          writer.releaseLock();
+        } catch (e) {}
+      }
+
+      // Also update local UI simulation
+      simulateHardwareResponse(cmd);
+    }
+
+    // Wireless Battery Telemetry Polling (ALWAYS runs even when Motor UART isConnected === true!)
+    let ignoredStaticX = -1;
+    let ignoredStaticY = -1;
+    let ignoredStaticPx = 0;
+
+    async function pollWifiTelemetry() {
+      try {
+        const input = document.getElementById("cameraStreamUrlInput");
+        let wifiBaseUrl = input ? input.value.trim() : "http://192.168.4.1/";
+        if (!wifiBaseUrl.startsWith("http")) wifiBaseUrl = "http://" + wifiBaseUrl;
+        wifiBaseUrl = wifiBaseUrl.replace(/\/+$/, "");
+        const res = await fetch(`${wifiBaseUrl}/telemetry`, { signal: AbortSignal.timeout(500) });
+        if (res.ok) {
+          const data = await res.json();
+          const telem = document.getElementById("hudCvTelemetry");
+          if (telem) {
+            telem.textContent = `WIFI LINK: OK // TARGET: ${elevationState} // CV: ${cvCurrentState}`;
+            telem.setAttribute("fill", cvCurrentState === CV_STATE.ARMED ? "#2cff55" : "#ffcc00");
+          }
+        }
+      } catch (e) {}
+    }
+    setInterval(pollWifiTelemetry, 350);
+
+    // --- SIMULATION ENGINE ---
+    function simulateHardwareResponse(cmd) {
+      if (cmd.startsWith("TARGET,")) {
+        let cm = parseFloat(cmd.substring(7));
+        simulateMoveTo(cm / 100.0);
+      } else if (cmd === "ZERO") {
+        updateCarriagePosition(0.0);
+        logTerm("◄ Position reset to 0.00 cm (0 steps)");
+      } else if (cmd === "STATUS") {
+        let cm = currentDistanceMeters * 100.0;
+        logTerm(`◄ Distance from Zero: ${cm.toFixed(2)} cm (${Math.round(cm * STEPS_PER_CM)} steps) | Rail Max: 174.0 cm`);
+      } else if (cmd === "STOP") {
+        setMotionState(false);
+        logTerm("◄ [ALERT] Motion halted.");
+      }
+    }
+
+    function simulateMoveTo(targetM) {
+      targetM = Math.max(MIN_METERS, Math.min(MAX_METERS, targetM));
+      let startM = currentDistanceMeters;
+      let distM = Math.abs(targetM - startM);
+      if (distM === 0) {
+        onArrivalAtTarget();
+        return;
+      }
+
+      setMotionState(true);
+      let durationMs = Math.min(3500, Math.max(200, distM * (1040.0 * 100.0 / motorSpeedPercent)));
+      let startTime = performance.now();
+
+      function anim(now) {
+        let elapsed = now - startTime;
+        let p = Math.min(1.0, elapsed / durationMs);
+        let m = startM + (targetM - startM) * p;
+        updateCarriagePosition(m);
+
+        if (p < 1.0 && isMoving) {
+          requestAnimationFrame(anim);
+        } else {
+          setMotionState(false);
+          logTerm(`◄ Movement complete. Target arrived at ${(targetM * 100).toFixed(2)} cm`);
+          onArrivalAtTarget();
+        }
+      }
+      requestAnimationFrame(anim);
+    }
+
+    // --- STOP POINT FEATURE CONTROLS ---
+    function setStopPoint(meters) {
+      chosenStopPointMeters = Math.max(MIN_METERS, Math.min(MAX_METERS, Number(meters)));
+      let cm = chosenStopPointMeters * 100.0;
+      let steps = Math.round(cm * STEPS_PER_CM);
+
+      document.getElementById("inputStopPoint").value       = chosenStopPointMeters.toFixed(2);
+      document.getElementById("sliderStopPoint").value      = chosenStopPointMeters.toFixed(2);
+      document.getElementById("stopPointCmText").innerText   = cm.toFixed(1);
+      document.getElementById("stopPointStepsText").innerText = steps.toLocaleString();
+      document.getElementById("railStopPointLabel").innerText = `${chosenStopPointMeters.toFixed(2)}m`;
+      if (!isMoving && document.getElementById("tileStartStopSub")) {
+        let atStop = Math.abs(currentDistanceMeters - chosenStopPointMeters) < 0.01;
+        let nextLabel = atStop ? "RETURN TO 0.0m" : `TO STOP POINT (${chosenStopPointMeters.toFixed(2)}m)`;
+        document.getElementById("tileStartStopSub").innerText = `${nextLabel} [S]`;
+      }
+
+      // Position red dashed stop line on 1.74m rail
+      let pct = (chosenStopPointMeters / MAX_METERS) * 100;
+      document.getElementById("stopPointMarker").style.left = `${pct}%`;
+
+      updateDistanceRemaining();
+    }
+
+    function onStopPointInputChange(val) {
+      setStopPoint(parseFloat(val) || 1.50);
+    }
+
+    function onStopPointSliderChange(val) {
+      setStopPoint(parseFloat(val));
+    }
+
+    // Click anywhere on rail track to place the Stop Point!
+    function handleRailTrackClick(e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1.0, clickX / rect.width));
+      const targetM = ratio * MAX_METERS;
+      setStopPoint(Math.round(targetM * 100) / 100);
+      logTerm(`[Config] Target Stop Point set to ${chosenStopPointMeters.toFixed(2)}m (${(chosenStopPointMeters*100).toFixed(1)} cm)`);
+    }
+
+    function updateDistanceRemaining() {
+      let delta = Math.abs(chosenStopPointMeters - currentDistanceMeters);
+      document.getElementById("distanceRemainingLabel").innerText = `${delta.toFixed(3)} m`;
+    }
+
+    // --- CARRIAGE POSITION & MOTION UPDATE ---
+    function updateCarriagePosition(meters) {
+      currentDistanceMeters = Math.max(MIN_METERS, Math.min(MAX_METERS, meters));
+      let cm = currentDistanceMeters * 100.0;
+      currentStepCount = Math.round(cm * STEPS_PER_CM);
+
+      document.getElementById("displayDistanceMeters").innerText = currentDistanceMeters.toFixed(3);
+      document.getElementById("displayDistanceCm").innerText     = cm.toFixed(1);
+      document.getElementById("displayStepCount").innerText      = currentStepCount.toLocaleString();
+
+      let pct = (currentDistanceMeters / MAX_METERS) * 100;
+      document.getElementById("railCarriageMarker").style.left   = `${pct}%`;
+      document.getElementById("carriageTag").innerText           = `${currentDistanceMeters.toFixed(2)}m`;
+
+      updateDistanceRemaining();
+    }
+
+    function setMotionState(moving) {
+      isMoving = moving;
+      const statusBadge = document.getElementById("displayCarriageStatus");
+      const tileStartStop = document.getElementById("tileStartStop");
+      const tileTitle = document.getElementById("tileStartStopTitle");
+      const tileSub = document.getElementById("tileStartStopSub");
+      const headerStatus = document.getElementById("headerSysStatus");
+
+      if (moving) {
+        let dirLabel = (chosenStopPointMeters >= currentDistanceMeters) ? "MOVING AWAY ▲" : "RETURNING ▼";
+        statusBadge.innerText = `${dirLabel} // ${elevationState}`;
+        headerStatus.innerText = "SYS: MOVING";
+        headerStatus.style.backgroundColor = "#283a2a";
+
+        if (tileStartStop) {
+          tileStartStop.classList.remove("active-run");
+          tileStartStop.classList.add("active-stop");
+          tileTitle.innerText = "STOP TARGET";
+          tileSub.innerText = "HALT MOTION [S]";
+        }
+      } else {
+        let atStop = Math.abs(currentDistanceMeters - chosenStopPointMeters) < 0.01;
+        statusBadge.innerText = atStop ? `AT STOP POINT (${chosenStopPointMeters.toFixed(2)}m)` : `STOPPED // ${elevationState}`;
+        headerStatus.innerText = isEmergencyStop ? "SYS: ESTOP" : (isShuttleActive ? "SYS: SHUTTLE" : "SYS: READY");
+        headerStatus.style.backgroundColor = isEmergencyStop ? "var(--mil-miss)" : (isShuttleActive ? "#283a2a" : "#353c34");
+
+        if (tileStartStop) {
+          tileStartStop.classList.remove("active-stop");
+          tileStartStop.classList.add("active-run");
+          tileTitle.innerText = "START TARGET";
+          let nextTargetLabel = atStop ? "RETURN TO 0.0m" : `TO STOP POINT (${chosenStopPointMeters.toFixed(2)}m)`;
+          tileSub.innerText = `${nextTargetLabel} [S]`;
+        }
+      }
+    }
+
+    // --- COMMAND ACTIONS (START/STOP TOGGLE & RESET) ---
+    function toggleStartStop() {
+      if (isEmergencyStop) return;
+      if (isMoving || isShuttleActive) {
+        handleStopCommand();
+      } else {
+        handleRunCommand();
+      }
+    }
+
+    function handleRunCommand() {
+      if (isEmergencyStop) return;
+      let atStop = Math.abs(currentDistanceMeters - chosenStopPointMeters) < 0.01;
+      let targetM = atStop ? 0.00 : chosenStopPointMeters;
+      let cm = targetM * 100.0;
+      sendRawCommand(`TARGET,${cm.toFixed(1)}`);
+      logTerm(`[Command] Driving carriage to ${targetM.toFixed(2)}m (${cm.toFixed(1)} cm)`);
+    }
+
+    function handleStopCommand() {
+      stopShuttleLoop();
+      sendRawCommand("STOP");
+      setMotionState(false);
+    }
+
+    // --- PHYSICAL SERVO POP TARGET ENGINE (COM7 / pop.ino) ---
+    const targetServoStates = { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false };
+
+    function checkSerialConnected(showAlert = false) {
+      if (!isConnected || !port || !port.writable) {
+        logTerm("[Warning] Serial COM7 not connected. (Click 'CONNECT ESP32' at top right to connect servo pop controller).");
+        if (showAlert) {
+          alert("ESP32 Serial is not connected!\n\nPlease click the green 'CONNECT ESP32' button at the top right of the dashboard and select COM7 (Silicon Labs CP210x).");
+        }
+        return false;
+      }
+      return true;
+    }
+
+    function toggleSingleServo(id) {
+      if (targetServoStates[id]) {
+        lowerTarget(id);
+      } else {
+        raiseTarget(id);
+      }
+    }
+
+    function raiseTarget(id) {
+      targetServoStates[id] = true;
+      elevationState = 'UP';
+      window.lastPopUpTimeMs = Date.now();
+      stuckBulletAcknowledged = false;
+      const resBadge = document.getElementById("shotResultBadge");
+      if (resBadge) {
+        resBadge.innerText = "🎯 TARGET UP (ARMED) — FIRE NOW!";
+        resBadge.style.color = "#ffcc00";
+        resBadge.style.borderColor = "#ffcc00";
+      }
+      const banner = document.getElementById("nerfOptimalHudBanner");
+      if (banner) banner.style.display = "none";
+      sendRawCommand(`UP,${id}`);
+      logTerm(`[Servo Pop] Raising Target ${id} (UP,${id})...`);
+      updateServoButtonUI(id, true);
+      const targetFace = document.getElementById("targetFace");
+      if (targetFace) {
+        targetFace.style.transform = "none";
+        targetFace.style.opacity = "1.0";
+      }
+      const badge = document.getElementById("targetElevationBadge");
+      if (badge) {
+        badge.innerText = "EXPOSED";
+        badge.style.backgroundColor = "var(--mil-hit)";
+      }
+      const timerLabel = document.getElementById("exposureTimerLabel");
+      if (timerLabel) timerLabel.innerText = "EXPOSED [ARMING...]";
+      const pBar = document.getElementById("exposureProgressBar");
+      if (pBar) pBar.style.width = "100%";
+      startCvPopCycle(id, 5.0);
+    }
+
+    function lowerTarget(id) {
+      targetServoStates[id] = false;
+      elevationState = 'DOWN';
+      resetCvStateToIdle();
+      sendRawCommand(`DOWN,${id}`);
+      logTerm(`[Servo Pop] Lowering Target ${id} (DOWN,${id})...`);
+      updateServoButtonUI(id, false);
+      const targetFace = document.getElementById("targetFace");
+      if (targetFace) {
+        targetFace.style.transform = "rotateX(60deg) scale(0.92) translateY(24px)";
+        targetFace.style.opacity = "0.35";
+      }
+      const badge = document.getElementById("targetElevationBadge");
+      if (badge) {
+        badge.innerText = "CONCEALED";
+        badge.style.backgroundColor = "var(--mil-dark)";
+      }
+      const timerLabel = document.getElementById("exposureTimerLabel");
+      if (timerLabel) timerLabel.innerText = "CONCEALED";
+      const pBar = document.getElementById("exposureProgressBar");
+      if (pBar) pBar.style.width = "0%";
+    }
+
+    function sendPopServo(action) {
+      if (action === 'ALL_DOWN') {
+        for (let k in targetServoStates) targetServoStates[k] = false;
+        elevationState = 'DOWN';
+        resetCvStateToIdle();
+        if (exposureTimer) {
+          clearInterval(exposureTimer);
+          exposureTimer = null;
+        }
+        sendRawCommand("DOWN,ALL");
+        logTerm("[Servo Pop] Dropping all targets (DOWN,ALL)...");
+        updateAllServoButtonsUI(false);
+        const targetFace = document.getElementById("targetFace");
+        if (targetFace) {
+          targetFace.style.transform = "rotateX(60deg) scale(0.92) translateY(24px)";
+          targetFace.style.opacity = "0.35";
+        }
+        const badge = document.getElementById("targetElevationBadge");
+        if (badge) {
+          badge.innerText = "CONCEALED";
+          badge.style.backgroundColor = "var(--mil-dark)";
+        }
+        const timerLabel = document.getElementById("exposureTimerLabel");
+        if (timerLabel) timerLabel.innerText = "CONCEALED";
+        const pBar = document.getElementById("exposureProgressBar");
+        if (pBar) pBar.style.width = "0%";
+      } else {
+        raiseTarget(action);
+      }
+    }
+
+    function handlePopCommand(targetId = 1, duration = 15.0) {
+      exposureSeconds = duration;
+      elevationState = 'UP';
+      targetServoStates[targetId] = true;
+      window.lastPopUpTimeMs = Date.now();
+      stuckBulletAcknowledged = false;
+
+      const resBadge = document.getElementById("shotResultBadge");
+      if (resBadge) {
+        resBadge.innerText = `🎯 TARGET UP (ARMED) — (${duration.toFixed(0)}s)`;
+        resBadge.style.color = "#2cff55";
+        resBadge.style.borderColor = "#2cff55";
+      }
+      const banner = document.getElementById("nerfOptimalHudBanner");
+      if (banner) banner.style.display = "none";
+
+      // Send physical serial/WiFi command to raise target!
+      sendRawCommand(`UP,${targetId}`);
+      logTerm(`[Pop Cycle] Physical Target ${targetId} POPPED UP for ${duration.toFixed(0)}s (UP,${targetId})`);
+
+      const badge = document.getElementById("targetElevationBadge");
+      if (badge) {
+        badge.innerText = `EXPOSED [${duration.toFixed(0)}s]`;
+        badge.style.backgroundColor = "var(--mil-hit)";
+      }
+      
+      const tilePop = document.getElementById("tilePop");
+      if (tilePop) tilePop.classList.add("active-pop");
+      const tilePopTitle = document.getElementById("tilePopTitle");
+      if (tilePopTitle) tilePopTitle.innerText = "EXPOSED (15s)";
+
+      const targetFace = document.getElementById("targetFace");
+      if (targetFace) {
+        targetFace.style.transform = "none";
+        targetFace.style.opacity = "1.0";
+      }
+
+      updateServoButtonUI(targetId, true);
+
+      // Start deterministic CV state machine for this pop cycle
+      startCvPopCycle(targetId, duration);
+
+      if (exposureTimer) clearInterval(exposureTimer);
+      exposureTimer = setInterval(() => {
+        exposureSeconds -= 0.1;
+        if (exposureSeconds <= 0) {
+          clearInterval(exposureTimer);
+          exposureTimer = null;
+          foldTarget(targetId);
+          if (!stuckBulletAcknowledged) {
+            const rb = document.getElementById("shotResultBadge");
+            if (rb) {
+              rb.innerText = "❌ MISS — NO BULLET DETECTED (TARGET DROPPED)";
+              rb.style.color = "#ff453a";
+              rb.style.borderColor = "#ff453a";
+            }
+            const bnr = document.getElementById("nerfOptimalHudBanner");
+            if (bnr) {
+              bnr.style.display = "block";
+              bnr.innerText = "❌ MISS! 5.0s EXPIRED // NO BULLET HIT";
+              bnr.style.borderColor = "#ff453a";
+              bnr.style.color = "#ff453a";
+              bnr.style.boxShadow = "0 0 20px rgba(255, 69, 58, 0.7)";
+            }
+            logTerm(`[🎯 SHOT RESULT] ❌ MISS — 5.0s elapsed with no bullet hit. Target dropped.`);
+          }
+        } else {
+          const tLabel = document.getElementById("exposureTimerLabel");
+          if (tLabel) tLabel.innerText = `${exposureSeconds.toFixed(1)}s REMAINING`;
+          const pBar = document.getElementById("exposureProgressBar");
+          if (pBar) pBar.style.width = `${(exposureSeconds / duration) * 100}%`;
+        }
+      }, 100);
+    }
+
+    function foldTarget(targetId = 1) {
+      elevationState = 'DOWN';
+      targetServoStates[targetId] = false;
+
+      if (exposureTimer) {
+        clearInterval(exposureTimer);
+        exposureTimer = null;
+      }
+
+      // Send physical serial command to lower target!
+      sendRawCommand(`DOWN,${targetId}`);
+      logTerm(`[Pop Cycle] Target ${targetId} CONCEALED (DOWN,${targetId})`);
+
+      const badge = document.getElementById("targetElevationBadge");
+      if (badge) {
+        badge.innerText = "CONCEALED [DOWN]";
+        badge.style.backgroundColor = "var(--mil-dark)";
+      }
+      
+      const tilePop = document.getElementById("tilePop");
+      if (tilePop) tilePop.classList.remove("active-pop");
+      const tilePopTitle = document.getElementById("tilePopTitle");
+      if (tilePopTitle) tilePopTitle.innerText = "POP TARGET (5s)";
+      const tilePopSub = document.getElementById("tilePopSub");
+      if (tilePopSub) tilePopSub.innerText = "SERVO FOLDED";
+
+      const timerLabel = document.getElementById("exposureTimerLabel");
+      if (timerLabel) timerLabel.innerText = "CONCEALED";
+      const pBar = document.getElementById("exposureProgressBar");
+      if (pBar) pBar.style.width = "0%";
+      
+      const targetFace = document.getElementById("targetFace");
+      if (targetFace) {
+        targetFace.style.transform = "rotateX(60deg) scale(0.92) translateY(24px)";
+        targetFace.style.opacity = "0.35";
+      }
+
+      updateServoButtonUI(targetId, false);
+    }
+
+    function updateServoButtonUI(id, isUp) {
+      const btn = document.getElementById(`btnServo${id}`);
+      if (btn) {
+        if (isUp) {
+          btn.classList.add("ref-btn-accent");
+          btn.innerText = `T${id} [UP]`;
+        } else {
+          btn.classList.remove("ref-btn-accent");
+          btn.innerText = `T${id} [DOWN]`;
+        }
+      }
+      const posLabel = document.getElementById("servoActivePosLabel");
+      if (posLabel) {
+        posLabel.innerText = `Target ${id}: ${isUp ? 'UP (Exposed)' : 'DOWN (Concealed)'}`;
+      }
+    }
+
+    function updateAllServoButtonsUI(isUp) {
+      [1, 2, 3].forEach(id => updateServoButtonUI(id, isUp));
+    }
+
+    function handleEmergencyStop() {
+      stopShuttleLoop();
+      isEmergencyStop = !isEmergencyStop;
+      sendRawCommand("STOP");
+      setMotionState(false);
+
+      const btnEstop = document.getElementById("btnEstop");
+      if (isEmergencyStop) {
+        btnEstop.style.backgroundColor = "var(--mil-miss)";
+        document.getElementById("headerSysStatus").innerText = "ESTOP ACTIVE";
+        document.getElementById("headerSysStatus").style.backgroundColor = "var(--mil-miss)";
+        logTerm("[ESTOP] EMERGENCY STOP ACTIVE! CARRIAGE HALTED.");
+      } else {
+        btnEstop.style.backgroundColor = "#2e342d";
+        document.getElementById("headerSysStatus").innerText = "SYS: READY";
+        document.getElementById("headerSysStatus").style.backgroundColor = "#353c34";
+        logTerm("[ESTOP] Emergency Stop cleared.");
+      }
+    }
+
+    function sendZeroCommand() {
+      if (confirm("Reset current position as 0.00 cm Reference Origin?")) {
+        sendRawCommand("ZERO");
+        updateCarriagePosition(0.0);
+      }
+    }
+
+    // --- TARGET IMPACT SIMULATION ---
+    function handleTargetClick(e) {
+      if (isEmergencyStop || elevationState === 'DOWN') return;
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const scale = 150.0 / rect.width;
+      const xMm = clickX * scale;
+      const yMm = clickY * scale;
+
+      // Optimal hit zone is [50, 50] to [100, 100]
+      const isHit = (xMm >= 50 && xMm <= 100 && yMm >= 50 && yMm <= 100);
+      const result = isHit ? "HIT" : "MISS";
+
+      const distMm = Math.hypot(xMm - 75, yMm - 75);
+
+      // Render dot on target
+      const dot = document.createElement("div");
+      dot.style.position = "absolute";
+      dot.style.left = `${(xMm / 150) * 100}%`;
+      dot.style.top = `${(yMm / 150) * 100}%`;
+      dot.style.width = "9px";
+      dot.style.height = "9px";
+      dot.style.transform = "translate(-50%, -50%)";
+      dot.style.borderRadius = "50%";
+      dot.style.backgroundColor = isHit ? "var(--mil-hit)" : "var(--mil-miss)";
+      dot.style.border = "1.5px solid #ffffff";
+      dot.style.boxShadow = "0 0 8px rgba(0,0,0,0.5)";
+      dot.style.pointerEvents = "none";
+      document.getElementById("impactDotsContainer").appendChild(dot);
+
+      // Verdict label
+      document.getElementById("verdictLabel").innerText = `${result} // ${distMm.toFixed(1)}mm FROM CENTER`;
+      const vBadge = document.getElementById("verdictBadge");
+      vBadge.innerText = result;
+      vBadge.style.backgroundColor = isHit ? "var(--mil-hit)" : "var(--mil-miss)";
+      vBadge.style.color = "#ffffff";
+
+      // Add shot record
+      recordShot(result, distMm);
+    }
+
+    function recordShot(result, distMm) {
+      let shotNum = shots.length + 1;
+      let now = new Date();
+      let timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+      shots.push({ num: shotNum, result, distMm, time: timeStr, posM: currentDistanceMeters });
+
+      // Update HUD
+      let hits = shots.filter(s => s.result === "HIT").length;
+      let misses = shots.filter(s => s.result === "MISS").length;
+      let acc = (hits / shots.length) * 100;
+
+      document.getElementById("hudShotNum").innerText = String(shots.length).padStart(2, '0');
+      document.getElementById("hudRemaining").innerText = Math.max(0, 20 - shots.length);
+      document.getElementById("hudHits").innerText = hits;
+      document.getElementById("hudMisses").innerText = misses;
+      document.getElementById("hudAccuracy").innerText = `${acc.toFixed(1)}%`;
+      document.getElementById("logCounter").innerText = `${shots.length} OF 20 RECORDED`;
+
+      // Prepend to impact log
+      document.getElementById("emptyLogNotice").style.display = "none";
+      const logBox = document.getElementById("impactLogContainer");
+      const row = document.createElement("div");
+      row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 3px 8px; background-color: #ffffff; border: 1px solid var(--mil-border-light); font-family: var(--font-mono); font-size: 10px;";
+      row.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-weight: 800; color: var(--text-dark);">#${String(shotNum).padStart(2, '0')}</span>
+          <span style="font-weight: 900; padding: 1px 5px; background-color: ${result === 'HIT' ? 'var(--mil-hit)' : 'var(--mil-miss)'}; color: #ffffff; font-size: 8px;">${result}</span>
+          <span style="font-weight: 700; color: var(--text-dark);">${currentDistanceMeters.toFixed(3)} m</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="color: var(--text-muted); font-size: 9px;">${distMm.toFixed(1)} mm off-center</span>
+          <span style="color: var(--text-muted); font-size: 8px;">${timeStr}</span>
+        </div>
+      `;
+      logBox.insertBefore(row, logBox.firstChild);
+    }
+
+    function resetShots() {
+      resetSession();
+    }
+
+    function resetSession() {
+      if (autoDropAfterShotTimer) {
+        clearTimeout(autoDropAfterShotTimer);
+        autoDropAfterShotTimer = null;
+      }
+      shots = [];
+      const simDots = document.getElementById("impactDotsContainer");
+      if (simDots) simDots.innerHTML = "";
+      const camDots = document.getElementById("camImpactDotsContainer");
+      if (camDots) camDots.innerHTML = "";
+      const banner = document.getElementById("nerfOptimalHudBanner");
+      if (banner) banner.style.display = "none";
+      
+      stuckBulletAcknowledged = false;
+      lastDetectedBulletPos = null;
+      nerfTrackHistory = [];
+      calibrateEmptyTargetBaseline();
+
+      document.getElementById("impactLogContainer").innerHTML = `<div id="emptyLogNotice" style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; font-style: italic; text-align: center; padding: 8px;">NO SHOTS LOGGED // CLICK TARGET TO RECORD IMPACT</div>`;
+      document.getElementById("hudShotNum").innerText = "00";
+      document.getElementById("hudRemaining").innerText = "20";
+      document.getElementById("hudHits").innerText = "0";
+      document.getElementById("hudMisses").innerText = "0";
+      document.getElementById("hudAccuracy").innerText = "0.0%";
+      document.getElementById("logCounter").innerText = "0 OF 20 RECORDED";
+      document.getElementById("verdictLabel").innerText = "STANDBY // CLICK TARGET";
+      document.getElementById("verdictBadge").innerText = "READY";
+      document.getElementById("verdictBadge").style.backgroundColor = "var(--mil-canvas-tint)";
+      document.getElementById("verdictBadge").style.color = "var(--text-dark)";
+      logTerm("[Target] Session and shot markings cleared. Re-calibrating empty target baseline.");
+    }
+
+    // =========================================================================
+    // OPTICAL CAMERA STREAMING & VISION INTEGRATION (USB UVC & WiFi MJPEG)
+    // =========================================================================
+    let activeTargetView = 'camera'; // 'camera' or 'sim'
+    let webcamStream = null;
+    let isCameraRunning = false;
+
+    // Switch between Camera Stream and Simulated Target Canvas
+    function switchTargetView(mode) {
+      activeTargetView = mode;
+      const camContainer = document.getElementById("cameraViewportContainer");
+      const simContainer = document.getElementById("simTargetContainer");
+      const tabCam = document.getElementById("tabModeCamera");
+      const tabSim = document.getElementById("tabModeSim");
+
+      if (mode === 'camera') {
+        camContainer.style.display = "block";
+        simContainer.style.display = "none";
+        tabCam.classList.add("ref-btn-accent");
+        tabSim.classList.remove("ref-btn-accent");
+        tabSim.style.backgroundColor = "#2b3329";
+        logTerm("[View] Switched to OPTICAL CAM [LIVE]");
+      } else {
+        camContainer.style.display = "none";
+        simContainer.style.display = "block";
+        tabSim.classList.add("ref-btn-accent");
+        tabCam.classList.remove("ref-btn-accent");
+        tabCam.style.backgroundColor = "#2b3329";
+        logTerm("[View] Switched to TARGET CANVAS (SIMULATION)");
+      }
+    }
+
+    // --- ESP32-P4 HIGH-SPEED USB SERIAL CAMERA RECEIVER (COM17 @ 3,000,000 BAUD) ---
+    let cameraPort = null;
+    let cameraReader = null;
+    let isCameraSerialConnected = false;
+    let cameraFrameCount = 0;
+    let lastCameraFpsTime = performance.now();
+    let currentCameraFps = 0.0;
+    let lastBlobUrl = null;
+    let lastLaserHitTime = 0;
+
+    async function toggleConnectCameraSerial() {
+      if (isCameraSerialConnected) {
+        await disconnectCameraSerial();
+      } else {
+        await connectCameraSerial();
+      }
+    }
+
+    async function connectCameraSerial() {
+      if (!("serial" in navigator)) {
+        alert("Web Serial API is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
+        return;
+      }
+
+      try {
+        logTerm("[Camera Serial] Requesting ESP32-P4 Port (Please select 'USB-Enhanced-SERIAL CH343' / COM17)...");
+        cameraPort = await navigator.serial.requestPort();
+        await cameraPort.open({ baudRate: 3000000, bufferSize: 131072 });
+
+        isCameraSerialConnected = true;
+        updateCameraSerialUI(true);
+        logTerm("[Camera Serial] Connected to ESP32-P4 at 3,000,000 baud! Streaming live video frames...");
+
+        const video = document.getElementById("webcamVideo");
+        const img = document.getElementById("espCameraImg");
+        const offlineNotice = document.getElementById("cameraOfflineNotice");
+        if (video) video.style.display = "none";
+        if (offlineNotice) offlineNotice.style.display = "none";
+        if (img) img.style.display = "block";
+
+        const sel = document.getElementById("cameraSourceSelect");
+        if (sel) sel.value = "serial";
+
+        readCameraSerialLoop();
+      } catch (err) {
+        logTerm(`[Camera Serial Error] ${err.message}`);
+        updateCameraSerialUI(false);
+      }
+    }
+
+    async function disconnectCameraSerial() {
+      isCameraSerialConnected = false;
+      try {
+        if (cameraReader) {
+          await cameraReader.cancel();
+          cameraReader.releaseLock();
+          cameraReader = null;
+        }
+        if (cameraPort) {
+          await cameraPort.close();
+          cameraPort = null;
+        }
+      } catch (e) {}
+      updateCameraSerialUI(false);
+      logTerm("[Camera Serial] Disconnected from COM17.");
+    }
+
+    function updateCameraSerialUI(connected) {
+      const dot = document.getElementById("camStatusDot");
+      const badge = document.getElementById("camStatusBadge");
+      const btn = document.getElementById("btnConnectCamSerial");
+
+      if (connected) {
+        if (dot) dot.style.backgroundColor = "#2cff55";
+        if (badge) {
+          badge.innerText = "COM17 LIVE [3M BAUD]";
+          badge.style.color = "var(--mil-hit)";
+        }
+        if (btn) {
+          btn.innerText = "🔌 DISCONNECT COM17";
+          btn.style.backgroundColor = "#5c1818";
+        }
+      } else {
+        if (dot) dot.style.backgroundColor = "#ffcc00";
+        if (badge) {
+          badge.innerText = "STREAM OFFLINE";
+          badge.style.color = "#ffcc00";
+        }
+        if (btn) {
+          btn.innerText = "🔌 CONNECT COM17";
+          btn.style.backgroundColor = "#1a4d2e";
+        }
+      }
+    }
+
+    async function readCameraSerialLoop() {
+      let chunks = [];
+      let totalChunkLen = 0;
+
+      while (isCameraSerialConnected && cameraPort && cameraPort.readable) {
+        try {
+          cameraReader = cameraPort.readable.getReader();
+          while (true) {
+            const { value, done } = await cameraReader.read();
+            if (done) break;
+            if (value && value.length > 0) {
+              chunks.push(value);
+              totalChunkLen += value.length;
+
+              if (totalChunkLen > 350000) {
+                chunks = [chunks[chunks.length - 1]];
+                totalChunkLen = chunks[0].length;
+              }
+
+              if (totalChunkLen >= 15) {
+                let flatBuffer = new Uint8Array(totalChunkLen);
+                let offset = 0;
+                for (let c of chunks) {
+                  flatBuffer.set(c, offset);
+                  offset += c.length;
+                }
+
+                let consumed = 0;
+                while (flatBuffer.length - consumed >= 15) {
+                  if (flatBuffer[consumed] === 0xAA && flatBuffer[consumed + 1] === 0x55 && flatBuffer[consumed + 2] === 0x01) {
+                    const view = new DataView(flatBuffer.buffer, flatBuffer.byteOffset + consumed, 15);
+                    const frameId = view.getUint32(3, true);
+                    const payloadLen = view.getUint32(7, true);
+
+                    if (payloadLen > 250000 || payloadLen === 0) {
+                      consumed += 1;
+                      continue;
+                    }
+
+                    const packetTotal = 15 + payloadLen;
+                    if (flatBuffer.length - consumed < packetTotal) {
+                      break;
+                    }
+
+                    const payload = flatBuffer.slice(consumed + 15, consumed + packetTotal);
+                    consumed += packetTotal;
+                    renderCameraBinaryFrame(payload, frameId);
+                  } else {
+                    consumed += 1;
+                  }
+                }
+
+                if (consumed > 0) {
+                  const remaining = flatBuffer.slice(consumed);
+                  chunks = remaining.length > 0 ? [remaining] : [];
+                  totalChunkLen = remaining.length;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          if (isCameraSerialConnected) {
+            logTerm(`[Camera Serial Stream] ${e.message}`);
+          }
+          break;
+        } finally {
+          if (cameraReader) {
+            try { cameraReader.releaseLock(); } catch(e) {}
+            cameraReader = null;
+          }
+        }
+      }
+    }
+
+    function renderCameraBinaryFrame(payload, frameId) {
+      if (!payload || payload.length === 0) return;
+
+      let eoi = -1;
+      for (let i = payload.length - 2; i >= 0; i--) {
+        if (payload[i] === 0xFF && payload[i+1] === 0xD9) {
+          eoi = i + 2;
+          break;
+        }
+      }
+
+      const jpegBytes = (eoi !== -1) ? payload.slice(0, eoi) : payload;
+      const blob = new Blob([jpegBytes], { type: "image/jpeg" });
+      const newUrl = URL.createObjectURL(blob);
+
+      const img = document.getElementById("espCameraImg");
+      if (img) {
+        img.src = newUrl;
+        if (lastBlobUrl) {
+          URL.revokeObjectURL(lastBlobUrl);
+        }
+        lastBlobUrl = newUrl;
+        img.onload = () => {
+          onCameraStreamLoad();
+          // Directly feed frame to deterministic hit detection engine
+          runDeterministicHitDetection(img);
+        };
+      }
+
+      cameraFrameCount++;
+      const now = performance.now();
+      if (now - lastCameraFpsTime >= 1000) {
+        currentCameraFps = (cameraFrameCount * 1000) / (now - lastCameraFpsTime);
+        cameraFrameCount = 0;
+        lastCameraFpsTime = now;
+        const badge = document.getElementById("camStatusBadge");
+        if (badge) {
+          badge.innerText = `COM17 [${currentCameraFps.toFixed(0)} FPS]`;
+        }
+      }
+    }
+
+    // =========================================================================
+    // HIGH-SPEED DETERMINISTIC NERF PROJECTILE EVENT DETECTOR
+    // Physical principles:
+    // 1. Zoomed-in camera observes ONLY the optimal black target region.
+    // 2. Multi-frame baseline established after target pops up and settles.
+    // 3. 4 fast deterministic checks:
+    //    - Check 1 (Baseline Diff): Real localized pixel change vs stationary dark target
+    //    - Check 2 (Orange/Yellow Color): Sudden appearance of Nerf chromatic spectrum
+    //    - Check 3 (Temporal Sudden Onset): Sharp jump between consecutive frames
+    //    - Check 4 (Spatial Coherence): Coherent clustered blob (rejects scattered noise)
+    // 4. Strict state machine: SETTLING -> CALIBRATING -> ARMED -> CONFIRMED -> LOCKED.
+    // =========================================================================
+    const CV_STATE = {
+      IDLE: 'IDLE',                       // Target down / concealed
+      POP_INITIATED: 'POP_INITIATED',     // Servo commanded UP
+      SETTLING: 'SETTLING',               // Settle window for servo swing and mechanical bounce
+      CALIBRATING: 'CALIBRATING',         // Multi-frame baseline accumulation (6 frames)
+      ARMED: 'ARMED',                     // Actively watching optimal ROI for projectile
+      CONFIRMING: 'CONFIRMING',           // Fast 1-2 frame confirmation for borderline events
+      HIT_CONFIRMED: 'HIT_CONFIRMED',     // Hit confirmed! Reverse command dispatched
+      LOCKED: 'LOCKED'                    // Locked until target fully retracted & next command
+    };
+
+    let cvCurrentState = CV_STATE.IDLE;
+    let cvStateTimestamp = performance.now();
+    let cvSettleDurationMs = 1800;        // Settle window: 1800ms (1.8s) to guarantee zero mechanical wobble
+    let cvDiffThreshold = 28;            // Delta threshold vs baseline (tunable)
+    let cvColorMinPx = 50;               // Minimum orange/yellow pixels for hit (tunable)
+    let cvBaselineTargetFrames = 10;     // Number of frames to average for baseline
+    let cvBaselineAccumulator = null;    // Float32Array accumulator for baseline
+    let cvBaselineSampleCount = 0;
+    let cvReferenceBaseline = null;      // Uint8ClampedArray: clean black target baseline
+    let cvTargetDarkMask = null;         // Uint8Array: 1 = dark black target interior, 0 = ambient background
+    let cvBaselineStaticPx = 0;          // Any pre-existing warm pixels on clean target
+    let cvPrevFrameData = null;          // Uint8ClampedArray of preceding frame
+    let cvConfirmationCandidate = null;  // Temporal candidate for persistence confirmation
+    let cvLastLatencyMs = 0.0;
+    let cvLastHitReason = "Awaiting projectile impact...";
+    let stuckBulletAcknowledged = false;  // UI & servo lock flag
+    let autoDropAfterShotTimer = null;
+    let cvWebcamLoopRunning = false;
+
+    // Off-screen canvas pipeline for lightning-fast analysis (~0.3ms per frame)
+    let cvAnalysisCanvas = null;
+    let cvAnalysisCtx = null;
+    let cvDiffMapCanvas = null;
+    let cvDiffMapCtx = null;
+    let cvColorMaskCanvas = null;
+    let cvColorMaskCtx = null;
+
+    function initCvCanvases() {
+      if (!cvAnalysisCanvas) {
+        cvAnalysisCanvas = document.createElement("canvas");
+        cvAnalysisCanvas.width = 160;
+        cvAnalysisCanvas.height = 160;
+        cvAnalysisCtx = cvAnalysisCanvas.getContext("2d", { willReadFrequently: true });
+
+        cvDiffMapCanvas = document.createElement("canvas");
+        cvDiffMapCanvas.width = 160;
+        cvDiffMapCanvas.height = 160;
+        cvDiffMapCtx = cvDiffMapCanvas.getContext("2d", { willReadFrequently: true });
+
+        cvColorMaskCanvas = document.createElement("canvas");
+        cvColorMaskCanvas.width = 160;
+        cvColorMaskCanvas.height = 160;
+        cvColorMaskCtx = cvColorMaskCanvas.getContext("2d", { willReadFrequently: true });
+      }
+    }
+
+    function updateCvStateBadge(label, color) {
+      const badge = document.getElementById("cvStateBadge");
+      if (badge) {
+        badge.innerText = label;
+        badge.style.color = color;
+        badge.style.borderColor = color;
+      }
+      const hudTelem = document.getElementById("hudCvTelemetry");
+      if (hudTelem) {
+        hudTelem.textContent = `CV: ${label}`;
+        hudTelem.setAttribute("fill", color);
+      }
+    }
+
+    // Called when target pop command is issued (Key '0' or Pop button)
+    function startCvPopCycle(targetId = 1, duration = 15.0) {
+      initCvCanvases();
+      cvCurrentState = CV_STATE.SETTLING;
+      cvStateTimestamp = performance.now();
+      cvBaselineAccumulator = null;
+      cvBaselineSampleCount = 0;
+      cvReferenceBaseline = null;
+      cvTargetDarkMask = null;
+      cvBaselineStaticPx = 0;
+      cvPrevFrameData = null;
+      cvConfirmationCandidate = null;
+      stuckBulletAcknowledged = false;
+
+      updateCvStateBadge(`SETTLING [${cvSettleDurationMs}ms]`, "#ffcc00");
+      const reasonEl = document.getElementById("cvDebugReason");
+      if (reasonEl) reasonEl.innerText = `Target rising... Settle lock active (${(cvSettleDurationMs/1000).toFixed(1)}s) to ignore mechanical servo swing.`;
+      logTerm(`[Target CV] Pop Cycle initiated. Target rising. Settling for ${cvSettleDurationMs}ms before baseline lock.`);
+    }
+
+    // Called when target drops or reset
+    function resetCvStateToIdle() {
+      cvCurrentState = CV_STATE.IDLE;
+      cvStateTimestamp = performance.now();
+      cvConfirmationCandidate = null;
+      cvTargetDarkMask = null;
+      stuckBulletAcknowledged = false;
+      updateCvStateBadge("IDLE (DOWN)", "#888888");
+      const reasonEl = document.getElementById("cvDebugReason");
+      if (reasonEl) reasonEl.innerText = "Target concealed. Press '0' or POP TARGET to start cycle.";
+    }
+
+    // Explicit baseline calibration button handler
+    function calibrateTargetBaselineNow() {
+      initCvCanvases();
+      cvCurrentState = CV_STATE.CALIBRATING;
+      cvStateTimestamp = performance.now();
+      cvBaselineAccumulator = null;
+      cvBaselineSampleCount = 0;
+      cvReferenceBaseline = null;
+      cvTargetDarkMask = null;
+      cvBaselineStaticPx = 0;
+      cvPrevFrameData = null;
+      cvConfirmationCandidate = null;
+      updateCvStateBadge("CALIBRATING...", "#ffcc00");
+      logTerm("[Target CV] Manual baseline re-calibration requested. Sampling stationary black target...");
+    }
+
+    // Core deterministic event detection loop running on every frame
+    function runDeterministicHitDetection(sourceEl) {
+      if (!sourceEl) return;
+      const frameStartTime = performance.now();
+
+      // Guard checks: verify source element readiness
+      const isVideo = (sourceEl.tagName === 'VIDEO');
+      if (isVideo) {
+        if (sourceEl.readyState < 2 || sourceEl.videoWidth === 0) return;
+      } else {
+        if (!sourceEl.complete || sourceEl.naturalWidth === 0) return;
+      }
+
+      initCvCanvases();
+
+      // Render frame into 160x160 analysis canvas
+      let imgData = null;
+      try {
+        cvAnalysisCtx.drawImage(sourceEl, 0, 0, 160, 160);
+        imgData = cvAnalysisCtx.getImageData(0, 0, 160, 160);
+      } catch (err) {
+        return; // Canvas security/loading exception guard
+      }
+      if (!imgData) return;
+
+      const data = imgData.data;
+      const now = performance.now();
+
+      // Update Live ROI preview thumbnail in Debug Inspector
+      const cLive = document.getElementById("canvasLiveRoi");
+      if (cLive) {
+        const ctxLive = cLive.getContext("2d");
+        ctxLive.drawImage(cvAnalysisCanvas, 0, 0, cLive.width, cLive.height);
+        // Draw green optimal circle overlay
+        ctxLive.strokeStyle = "#2cff55";
+        ctxLive.lineWidth = 1;
+        ctxLive.beginPath();
+        ctxLive.arc(cLive.width / 2, cLive.height / 2, cLive.width * 0.40, 0, Math.PI * 2);
+        ctxLive.stroke();
+      }
+
+      // STATE MACHINE EXECUTION
+      if (cvCurrentState === CV_STATE.IDLE) {
+        return; // Target is concealed, zero CPU waste
+      }
+
+      if (cvCurrentState === CV_STATE.LOCKED) {
+        return; // Post-hit lockout active; waiting for full retraction
+      }
+
+      // 1. SETTLING PHASE: Let servo swing finish and mechanical bounce dampen
+      if (cvCurrentState === CV_STATE.SETTLING) {
+        const elapsed = now - cvStateTimestamp;
+        if (elapsed < cvSettleDurationMs) {
+          const remaining = Math.round(cvSettleDurationMs - elapsed);
+          updateCvStateBadge(`SETTLING [${remaining}ms]`, "#ffcc00");
+          return;
+        }
+        // Transition to baseline calibration
+        cvCurrentState = CV_STATE.CALIBRATING;
+        cvBaselineAccumulator = new Float32Array(data.length);
+        cvBaselineSampleCount = 0;
+        updateCvStateBadge(`CALIBRATING [0/${cvBaselineTargetFrames}]`, "#ffcc00");
+        return;
+      }
+
+      // 2. CALIBRATING PHASE: Accumulate clean baseline frames of 100% stationary black target
+      if (cvCurrentState === CV_STATE.CALIBRATING) {
+        if (!cvBaselineAccumulator) {
+          cvBaselineAccumulator = new Float32Array(data.length);
+          cvBaselineSampleCount = 0;
+        }
+        for (let i = 0; i < data.length; i++) {
+          cvBaselineAccumulator[i] += data[i];
+        }
+        cvBaselineSampleCount++;
+        updateCvStateBadge(`CALIBRATING [${cvBaselineSampleCount}/${cvBaselineTargetFrames}]`, "#ffcc00");
+
+        if (cvBaselineSampleCount >= cvBaselineTargetFrames) {
+          cvReferenceBaseline = new Uint8ClampedArray(data.length);
+          cvTargetDarkMask = new Uint8Array(160 * 160);
+          for (let i = 0; i < data.length; i++) {
+            cvReferenceBaseline[i] = Math.round(cvBaselineAccumulator[i] / cvBaselineSampleCount);
+          }
+          cvBaselineAccumulator = null;
+
+          // Build dark target face mask within optimal zone (radius 52 px around (80,80))
+          const cx0 = 80, cy0 = 80;
+          const scanRadius = 52;
+          const rSq = scanRadius * scanRadius;
+          let darkCount = 0;
+          let staticCount = 0;
+
+          for (let y = cy0 - scanRadius; y <= cy0 + scanRadius; y++) {
+            const dy = y - cy0;
+            const rowOffset = y * 160 * 4;
+            const maskRowOffset = y * 160;
+            for (let x = cx0 - scanRadius; x <= cx0 + scanRadius; x++) {
+              const dx = x - cx0;
+              if (dx * dx + dy * dy > rSq) continue;
+              const idx = rowOffset + x * 4;
+              const r = cvReferenceBaseline[idx];
+              const g = cvReferenceBaseline[idx + 1];
+              const b = cvReferenceBaseline[idx + 2];
+              const avgI = (r + g + b) / 3;
+              const maxChan = Math.max(r, g, b);
+
+              // Black target surface is dark: average <= 88 and max channel <= 98
+              if (avgI <= 88 && maxChan <= 98) {
+                cvTargetDarkMask[maskRowOffset + x] = 1;
+                darkCount++;
+              } else {
+                cvTargetDarkMask[maskRowOffset + x] = 0; // Ambient background / edge outside target
+              }
+
+              // Pre-existing warm spots check
+              if ((r >= 135 && g >= 110 && b <= 85 && (r - b) >= 45) || (r >= 140 && b <= 75 && (r - g) >= 20)) {
+                staticCount++;
+              }
+            }
+          }
+          cvBaselineStaticPx = staticCount;
+
+          cvCurrentState = CV_STATE.ARMED;
+          updateCvStateBadge("ARMED (OPTIMAL READY)", "#2cff55");
+
+          // Render baseline snapshot to inspector canvas
+          const cBase = document.getElementById("canvasBaseline");
+          if (cBase) {
+            const ctxBase = cBase.getContext("2d");
+            const baseImgData = new ImageData(cvReferenceBaseline, 160, 160);
+            const tempC = document.createElement("canvas");
+            tempC.width = 160; tempC.height = 160;
+            tempC.getContext("2d").putImageData(baseImgData, 0, 0);
+            ctxBase.drawImage(tempC, 0, 0, cBase.width, cBase.height);
+          }
+
+          const reasonEl = document.getElementById("cvDebugReason");
+          if (reasonEl) reasonEl.innerText = "Stationary target locked & ARMED! Only drops when a Nerf bullet is shot.";
+          logTerm(`[Target CV] Black target baseline locked (dark face: ${darkCount} px, static warm: ${cvBaselineStaticPx} px). ARMED! Waiting for Nerf bullet strike...`);
+        }
+        return;
+      }
+
+      // 3. ARMED / CONFIRMING PHASE: Deterministic 4-Check Event Detector
+      if (cvCurrentState === CV_STATE.ARMED || cvCurrentState === CV_STATE.CONFIRMING) {
+        if (!cvReferenceBaseline || !cvTargetDarkMask) {
+          calibrateTargetBaselineNow();
+          return;
+        }
+
+        const cx0 = 80, cy0 = 80;
+        const scanRadius = 52; // Optimal zone within target
+        const rSq = scanRadius * scanRadius;
+
+        let diffPxCount = 0;
+        let colorPxCount = 0;
+        let sumX = 0, sumY = 0;
+        let minX = 999, maxX = -1, minY = 999, maxY = -1;
+        let sumTemporalDelta = 0;
+        let roiTotalPx = 0;
+
+        // Buffers for visual debug canvases
+        const diffMapImgData = cvDiffMapCtx.createImageData(160, 160);
+        const diffMapData = diffMapImgData.data;
+        const colorMaskImgData = cvColorMaskCtx.createImageData(160, 160);
+        const colorMaskData = colorMaskImgData.data;
+
+        for (let y = cy0 - scanRadius; y <= cy0 + scanRadius; y++) {
+          const dy = y - cy0;
+          const rowOffset = y * 160 * 4;
+          const maskRowOffset = y * 160;
+          for (let x = cx0 - scanRadius; x <= cx0 + scanRadius; x++) {
+            const dx = x - cx0;
+            if (dx * dx + dy * dy > rSq) continue;
+            roiTotalPx++;
+
+            const idx = rowOffset + x * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+
+            const baseR = cvReferenceBaseline[idx];
+            const baseG = cvReferenceBaseline[idx + 1];
+            const baseB = cvReferenceBaseline[idx + 2];
+
+            // 1. Check Baseline Difference: Has pixel changed vs stationary dark target?
+            const delta = (Math.abs(r - baseR) + Math.abs(g - baseG) + Math.abs(b - baseB)) / 3;
+            // Nerf projectile is significantly brighter than the black target (jump >= 40)
+            const isBrighter = ((r + g) >= (baseR + baseG + 40));
+
+            if (delta >= cvDiffThreshold) {
+              diffPxCount++;
+              diffMapData[idx] = Math.min(255, delta * 3);     // Red
+              diffMapData[idx + 1] = Math.max(0, 200 - delta); // Green
+              diffMapData[idx + 2] = 220;                      // Blue
+              diffMapData[idx + 3] = 255;
+            }
+
+            // CRITICAL INVARIANT: Genuine hit pixel MUST be on the black target face!
+            // If the baseline was background (cardboard/wood/light), ignore it completely!
+            const isDarkTargetFace = (cvTargetDarkMask[maskRowOffset + x] === 1);
+            if (!isDarkTargetFace) continue;
+
+            // 2. Strict Nerf Dart Chromatic Signature (Yellow foam OR Orange tip)
+            // Vibrant Neon Yellow Foam:
+            const isYellowFoam = (
+              r >= 140 &&
+              g >= 115 &&
+              b <= 85 &&
+              (r - b) >= 55 &&
+              (g - b) >= 40 &&
+              (r + g) >= (2.25 * (b + 1)) &&
+              r >= (g - 25)
+            );
+
+            // High-Intensity Neon Orange Tip:
+            const isOrangeTip = (
+              r >= 145 &&
+              b <= 75 &&
+              (r - g) >= 20 &&
+              (r - b) >= 65 &&
+              (r + g) >= (1.95 * (b + 1))
+            );
+
+            const isNerfColor = isYellowFoam || isOrangeTip;
+
+            // Genuine projectile impact pixel: must be bright yellow/orange, on dark target face, AND changed vs baseline
+            if (isNerfColor && delta >= cvDiffThreshold && isBrighter) {
+              colorPxCount++;
+              sumX += x;
+              sumY += y;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+
+              // Color mask: Bright Yellow/Orange highlight
+              colorMaskData[idx] = 255;     // R
+              colorMaskData[idx + 1] = 210; // G
+              colorMaskData[idx + 2] = 0;   // B
+              colorMaskData[idx + 3] = 255; // Alpha
+            }
+
+            // 3. Temporal Onset Delta: Frame-to-frame jump
+            if (cvPrevFrameData) {
+              const prevR = cvPrevFrameData[idx];
+              const prevG = cvPrevFrameData[idx + 1];
+              const prevB = cvPrevFrameData[idx + 2];
+              const tDelta = (Math.abs(r - prevR) + Math.abs(g - prevG) + Math.abs(b - prevB)) / 3;
+              if (delta >= cvDiffThreshold) {
+                sumTemporalDelta += tDelta;
+              }
+            }
+          }
+        }
+
+        // Cache current frame for next temporal check
+        cvPrevFrameData = new Uint8ClampedArray(data);
+
+        // Subtract any pre-existing warm pixels present in clean baseline
+        const netDartPixels = Math.max(0, colorPxCount - cvBaselineStaticPx);
+
+        const diffRatio = (diffPxCount / Math.max(1, roiTotalPx)) * 100;
+        const colorRatio = (netDartPixels / Math.max(1, roiTotalPx)) * 100;
+        const meanTemporalOnset = diffPxCount > 0 ? (sumTemporalDelta / diffPxCount) : 0.0;
+
+        const bboxW = (maxX >= minX) ? (maxX - minX + 1) : 0;
+        const bboxH = (maxY >= minY) ? (maxY - minY + 1) : 0;
+        const bboxArea = bboxW * bboxH;
+        const blobDensity = bboxArea > 0 ? (netDartPixels / bboxArea) : 0.0;
+
+        // Check 1: Baseline Diff (localized region changed)
+        const check1Pass = (diffPxCount >= 30);
+
+        // Check 2: Vibrant Orange/Yellow Dart (real dart size >= cvColorMinPx)
+        const check2Pass = (netDartPixels >= cvColorMinPx);
+
+        // Check 3: Sudden Onset or substantial cluster
+        const check3Pass = (meanTemporalOnset >= 8.0 || netDartPixels >= (cvColorMinPx + 20));
+
+        // Check 4: Spatial Coherence (coherent physical blob, not a thin edge line)
+        const isSolidBlob = (bboxW >= 6 && bboxH >= 6 && blobDensity >= 0.18 && (bboxW / Math.max(1, bboxH) <= 3.2) && (bboxH / Math.max(1, bboxW) <= 3.2));
+        const check4Pass = isSolidBlob;
+
+        // Update Matrix Badges in Debug Inspector
+        const b1 = document.getElementById("cvCheck1Badge");
+        if (b1) {
+          b1.innerText = `${diffPxCount} px (${diffRatio.toFixed(1)}%)`;
+          b1.style.color = check1Pass ? "#2cff55" : "#888888";
+        }
+        const b2 = document.getElementById("cvCheck2Badge");
+        if (b2) {
+          b2.innerText = `${netDartPixels} px (${colorRatio.toFixed(1)}%)`;
+          b2.style.color = check2Pass ? "#2cff55" : "#888888";
+        }
+        const b3 = document.getElementById("cvCheck3Badge");
+        if (b3) {
+          b3.innerText = meanTemporalOnset.toFixed(1);
+          b3.style.color = check3Pass ? "#2cff55" : "#888888";
+        }
+        const b4 = document.getElementById("cvCheck4Badge");
+        if (b4) {
+          b4.innerText = `${Math.round(blobDensity * 100)}% (w:${bboxW}, h:${bboxH})`;
+          b4.style.color = check4Pass ? "#2cff55" : "#888888";
+        }
+
+        // Render Diff Map and Color Mask to Inspector Canvases
+        const cDiff = document.getElementById("canvasDiffMap");
+        if (cDiff) {
+          cvDiffMapCtx.putImageData(diffMapImgData, 0, 0);
+          cDiff.getContext("2d").drawImage(cvDiffMapCanvas, 0, 0, cDiff.width, cDiff.height);
+        }
+        const cColor = document.getElementById("canvasColorMask");
+        if (cColor) {
+          cvColorMaskCtx.putImageData(colorMaskImgData, 0, 0);
+          const ctxC = cColor.getContext("2d");
+          ctxC.drawImage(cvColorMaskCanvas, 0, 0, cColor.width, cColor.height);
+          if (netDartPixels > 0 && bboxW > 0) {
+            const scale = cColor.width / 160;
+            ctxC.strokeStyle = "#2cff55";
+            ctxC.lineWidth = 1.5;
+            ctxC.strokeRect(minX * scale, minY * scale, bboxW * scale, bboxH * scale);
+          }
+        }
+
+        const cx = netDartPixels > 0 ? (sumX / colorPxCount) : cx0;
+        const cy = netDartPixels > 0 ? (sumY / colorPxCount) : cy0;
+
+        // STRICT DECISION LOGIC: MANDATORY 2-FRAME PERSISTENCE
+        // Only trigger if a genuine dart-sized object appears AND stays at that position!
+        if (check1Pass && check2Pass && check4Pass) {
+          if (cvConfirmationCandidate && (now - cvConfirmationCandidate.time < 600)) {
+            const drift = Math.hypot(cx - cvConfirmationCandidate.x, cy - cvConfirmationCandidate.y);
+            if (drift <= 18.0) {
+              // CONFIRMED! The Nerf bullet was shot, hit the target, and stayed on the target!
+              const latency = performance.now() - frameStartTime;
+              triggerConfirmedHit(cx, cy, `Nerf Bullet Confirmed (${netDartPixels} px at ${cx.toFixed(0)},${cy.toFixed(0)})`, latency);
+              cvConfirmationCandidate = null;
+            } else {
+              cvConfirmationCandidate = { x: cx, y: cy, time: now, count: netDartPixels };
+            }
+          } else {
+            // First frame candidate: wait for next frame confirmation to reject glitches
+            cvConfirmationCandidate = { x: cx, y: cy, time: now, count: netDartPixels };
+            cvCurrentState = CV_STATE.CONFIRMING;
+            updateCvStateBadge("CONFIRMING BULLET...", "#ffcc00");
+            const reasonEl = document.getElementById("cvDebugReason");
+            if (reasonEl) reasonEl.innerText = `Potential hit seen at (${cx.toFixed(0)},${cy.toFixed(0)}): ${netDartPixels} px. Verifying persistence...`;
+          }
+        } else {
+          cvConfirmationCandidate = null;
+          if (cvCurrentState === CV_STATE.CONFIRMING) {
+            cvCurrentState = CV_STATE.ARMED;
+            updateCvStateBadge("ARMED (OPTIMAL READY)", "#2cff55");
+            const reasonEl = document.getElementById("cvDebugReason");
+            if (reasonEl) reasonEl.innerText = "Target ARMED. Waiting for Nerf bullet strike...";
+          }
+        }
+      }
+    }
+
+    // CONFIRMED HIT HANDLER: Dispatches reverse command to servo IMMEDIATELY
+    function triggerConfirmedHit(cx, cy, reasonStr, latencyMs) {
+      if (cvCurrentState === CV_STATE.HIT_CONFIRMED || cvCurrentState === CV_STATE.LOCKED || stuckBulletAcknowledged) {
+        return; // Guard against repeat triggers
+      }
+
+      cvCurrentState = CV_STATE.HIT_CONFIRMED;
+      stuckBulletAcknowledged = true;
+      cvLastLatencyMs = latencyMs;
+      cvLastHitReason = reasonStr;
+
+      // 1. REVERSE SERVO IMMEDIATELY! Dispatches DOWN,1 over Web Serial without ANY delay!
+      foldTarget(1);
+
+      // 2. Play optimal hit audio chirp
+      playOptimalHitChirp(true);
+
+      // 3. Update HUD & Reticle
+      updateCvStateBadge("HIT CONFIRMED! (REVERSING)", "#2cff55");
+      const latBadge = document.getElementById("cvLatencyBadge");
+      if (latBadge) latBadge.innerText = `${latencyMs.toFixed(1)} ms`;
+
+      const reasonEl = document.getElementById("cvDebugReason");
+      if (reasonEl) reasonEl.innerText = `HIT! ${reasonStr} | Latency: ${latencyMs.toFixed(1)}ms`;
+
+      // Animate Green Optimal Circle
+      const optCircle = document.getElementById("optimalZoneCircle");
+      if (optCircle) {
+        optCircle.classList.remove("optimal-hit-active");
+        void optCircle.offsetWidth; // Force CSS reflow
+        optCircle.classList.add("optimal-hit-active");
+      }
+
+      // Show HUD banner
+      const banner = document.getElementById("nerfOptimalHudBanner");
+      if (banner) {
+        banner.style.display = "block";
+        banner.innerText = `🎯 OPTIMAL HIT! // SERVO REVERSED (${latencyMs.toFixed(1)}ms)`;
+        banner.style.borderColor = "#2cff55";
+        banner.style.color = "#2cff55";
+        banner.style.boxShadow = "0 0 25px rgba(44, 255, 85, 0.9)";
+      }
+
+      // Visual impact dot on camera viewport
+      const container = document.getElementById("camImpactDotsContainer");
+      if (container) {
+        container.innerHTML = "";
+        const dot = document.createElement("div");
+        dot.style.position = "absolute";
+        dot.style.left = `${(cx / 160) * 100}%`;
+        dot.style.top = `${(cy / 160) * 100}%`;
+        dot.style.width = "14px";
+        dot.style.height = "14px";
+        dot.style.transform = "translate(-50%, -50%)";
+        dot.style.borderRadius = "50%";
+        dot.style.backgroundColor = "#2cff55";
+        dot.style.border = "2px solid #ffffff";
+        dot.style.boxShadow = "0 0 14px #2cff55";
+        dot.style.zIndex = "45";
+        container.appendChild(dot);
+      }
+
+      // Update Verdict card
+      const verdictLabel = document.getElementById("verdictLabel");
+      const verdictBadge = document.getElementById("verdictBadge");
+      if (verdictLabel) verdictLabel.innerText = `HIT: OPTIMAL ZONE (${latencyMs.toFixed(1)}ms)`;
+      if (verdictBadge) {
+        verdictBadge.innerText = "HIT (OPTIMAL)";
+        verdictBadge.style.backgroundColor = "var(--mil-hit)";
+        verdictBadge.style.color = "#000000";
+      }
+
+      // 4. Lock state machine to prevent repeat triggers until next cycle
+      cvCurrentState = CV_STATE.LOCKED;
+      logTerm(`[🎯 NERF HIT CONFIRMED] ${reasonStr} | Detection Latency: ${latencyMs.toFixed(1)}ms -> SERVO IMMEDIATELY REVERSED (DOWN,1)`);
+
+      // 5. Auto-clear shot markings after 3.0s cooldown
+      if (autoDropAfterShotTimer) clearTimeout(autoDropAfterShotTimer);
+      autoDropAfterShotTimer = setTimeout(() => {
+        logTerm("[Auto-Cycle] Shot markings cleared. Target ready for next pop command.");
+        resetShots();
+        resetCvStateToIdle();
+        autoDropAfterShotTimer = null;
+      }, 3000);
+    }
+
+    // Diagnostics: Force simulate hit for hardware bench verification
+    function testForceSimulateHit() {
+      logTerm("[Test Mode] Simulating instant Nerf hit event...");
+      triggerConfirmedHit(80, 80, "Manual Test Trigger (Bench Verification)", 2.4);
+    }
+
+    // Diagnostics: Collapsible threshold settings drawer
+    function toggleCvSettingsModal() {
+      const drawer = document.getElementById("cvTuningDrawer");
+      if (drawer) {
+        drawer.style.display = (drawer.style.display === "none" || drawer.style.display === "") ? "flex" : "none";
+      }
+    }
+
+    function updateCvThresholds(param, val) {
+      val = parseInt(val, 10);
+      if (param === 'diff') {
+        cvDiffThreshold = val;
+        const el = document.getElementById("valDiffThresh");
+        if (el) el.innerText = val;
+        logTerm(`[Target CV Tuning] Diff Sensitivity set to ${val}`);
+      } else if (param === 'color') {
+        cvColorMinPx = val;
+        const el = document.getElementById("valColorThresh");
+        if (el) el.innerText = val;
+        logTerm(`[Target CV Tuning] Orange Min Pixels set to ${val}`);
+      } else if (param === 'settle') {
+        cvSettleDurationMs = val;
+        const el = document.getElementById("valSettleMs");
+        if (el) el.innerText = `${val}ms`;
+        logTerm(`[Target CV Tuning] Servo Settle Time set to ${val}ms`);
+      }
+    }
+
+    function startCvDetectionLoop() {
+      // Direct in-browser deterministic engine is always active on incoming frames.
+    }
+
+    function playOptimalHitChirp(isOptimal) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(isOptimal ? 880 : 587.33, audioCtx.currentTime);
+        if (isOptimal) {
+          osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.16);
+        }
+        gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.28);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.28);
+      } catch(e) {}
+    }
+
+    // Video stream is strictly through COM port (COM17 via Python Backend @ :8001 or Direct WebSerial)
+    async function refreshCameraDevices() {
+      const select = document.getElementById("cameraSourceSelect");
+      if (select) {
+        select.innerHTML = '<option value="serial">🔌 ESP32-P4 USB Serial (COM17)</option>';
+        select.value = "serial";
+      }
+
+      // Connect image viewport to Python CV Backend video feed
+      const img = document.getElementById("espCameraImg");
+      const offlineNotice = document.getElementById("cameraOfflineNotice");
+      if (img) {
+        img.src = "http://localhost:8001/video_feed";
+        img.style.display = "block";
+        img.onerror = () => {
+          // If Python backend is not running, show prompt
+          if (offlineNotice) offlineNotice.style.display = "flex";
+        };
+        img.onload = () => {
+          if (offlineNotice) offlineNotice.style.display = "none";
+        };
+      }
+      logTerm("[Camera Stream] Configured strictly for COM17 via Python CV Backend (http://localhost:8001/video_feed).");
+    }
+
+    function onCameraSourceChange(val) {
+      const wifiRow = document.getElementById("wifiStreamRow");
+      if (val === 'serial') {
+        if (wifiRow) wifiRow.style.display = "none";
+        connectCameraSerial();
+      } else if (val === 'wifi') {
+        if (wifiRow) wifiRow.style.display = "flex";
+        disconnectCameraSerial();
+        reloadCameraStream();
+      } else {
+        if (wifiRow) wifiRow.style.display = "none";
+        disconnectCameraSerial();
+        startSelectedCamera();
+      }
+    }
+
+    async function startSelectedCamera() {
+      const select = document.getElementById("cameraSourceSelect");
+      const val = select ? select.value : 'wifi';
+      const img = document.getElementById("espCameraImg");
+      const video = document.getElementById("webcamVideo");
+      const offlineNotice = document.getElementById("cameraOfflineNotice");
+      const dot = document.getElementById("camStatusDot");
+      const badge = document.getElementById("camStatusBadge");
+      const toggleBtn = document.getElementById("btnToggleCamPower");
+
+      // Stop existing stream
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+        webcamStream = null;
+      }
+
+      if (val.startsWith("usb:")) {
+        const deviceId = val.substring(4);
+        try {
+          logTerm("[Camera] Starting USB UVC camera stream...");
+          dot.style.backgroundColor = "#ffcc00";
+          badge.innerText = "STARTING USB...";
+          badge.style.color = "#ffcc00";
+
+          const constraints = {
+            video: {
+              deviceId: deviceId ? { exact: deviceId } : undefined,
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          };
+
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          webcamStream = stream;
+          isCameraRunning = true;
+
+          if (img) img.style.display = "none";
+          if (offlineNotice) offlineNotice.style.display = "none";
+          if (video) {
+            video.srcObject = stream;
+            video.style.display = "block";
+          }
+
+          if (!cvWebcamLoopRunning) {
+            cvWebcamLoopRunning = true;
+            function runWebcamLoop() {
+              if (webcamStream && isCameraRunning) {
+                const vid = document.getElementById("webcamVideo");
+                if (vid && vid.readyState >= 2) {
+                  runDeterministicHitDetection(vid);
+                }
+                requestAnimationFrame(runWebcamLoop);
+              } else {
+                cvWebcamLoopRunning = false;
+              }
+            }
+            requestAnimationFrame(runWebcamLoop);
+          }
+
+          dot.style.backgroundColor = "#2cff55";
+          badge.innerText = "USB CAM [LIVE]";
+          badge.style.color = "var(--mil-hit)";
+          if (toggleBtn) {
+            toggleBtn.innerText = "STOP CAM";
+            toggleBtn.classList.remove("ref-btn-accent");
+            toggleBtn.style.backgroundColor = "#5c1818";
+          }
+          logTerm("[Camera] USB camera stream active!");
+        } catch (err) {
+          logTerm(`[USB Camera Error] ${err.name}: ${err.message}`);
+          dot.style.backgroundColor = "#ff4444";
+          badge.innerText = "USB ERROR";
+          badge.style.color = "#ff4444";
+          if (offlineNotice) {
+            document.getElementById("cameraOfflineDesc").innerText = `USB Cam Error: ${err.message}`;
+            offlineNotice.style.display = "flex";
+          }
+        }
+      } else {
+        // WiFi MJPEG mode
+        if (video) {
+          video.srcObject = null;
+          video.style.display = "none";
+        }
+        reloadCameraStream();
+      }
+    }
+
+    function toggleCameraPower() {
+      if (isCameraRunning) {
+        stopCamera();
+      } else {
+        startSelectedCamera();
+      }
+    }
+
+    function stopCamera() {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+        webcamStream = null;
+      }
+      isCameraRunning = false;
+
+      const video = document.getElementById("webcamVideo");
+      const img = document.getElementById("espCameraImg");
+      const dot = document.getElementById("camStatusDot");
+      const badge = document.getElementById("camStatusBadge");
+      const toggleBtn = document.getElementById("btnToggleCamPower");
+
+      if (video) {
+        video.srcObject = null;
+        video.style.display = "none";
+      }
+      if (img) img.style.display = "none";
+
+      dot.style.backgroundColor = "#888888";
+      badge.innerText = "CAM PAUSED";
+      badge.style.color = "#888888";
+      if (toggleBtn) {
+        toggleBtn.innerText = "START CAM";
+        toggleBtn.classList.add("ref-btn-accent");
+        toggleBtn.style.backgroundColor = "";
+      }
+      logTerm("[Camera] Video paused.");
+    }
+
+    // Camera Stream Connection & Status (WiFi MJPEG)
+    function reloadCameraStream() {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+        webcamStream = null;
+      }
+
+      const input = document.getElementById("cameraStreamUrlInput");
+      let url = input ? input.value.trim() : "http://192.168.4.1/";
+      if (!url) url = "http://192.168.4.1/";
+
+      const img = document.getElementById("espCameraImg");
+      const video = document.getElementById("webcamVideo");
+      const offlineNotice = document.getElementById("cameraOfflineNotice");
+      const dot = document.getElementById("camStatusDot");
+      const badge = document.getElementById("camStatusBadge");
+
+      if (video) video.style.display = "none";
+      if (img) img.style.display = "block";
+      if (offlineNotice) offlineNotice.style.display = "none";
+
+      dot.style.backgroundColor = "#ffcc00";
+      badge.innerText = "CONNECTING...";
+      badge.style.color = "#ffcc00";
+
+      const cacheBustUrl = url.includes("?") ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
+      img.src = cacheBustUrl;
+      logTerm(`[Camera] Connecting to WiFi MJPEG stream at ${url}...`);
+    }
+
+    function onCameraStreamLoad() {
+      const dot = document.getElementById("camStatusDot");
+      const badge = document.getElementById("camStatusBadge");
+      const offlineNotice = document.getElementById("cameraOfflineNotice");
+
+      if (dot) dot.style.backgroundColor = "#2cff55";
+      if (badge && !isCameraSerialConnected) {
+        badge.innerText = "CAM [LIVE]";
+        badge.style.color = "var(--mil-hit)";
+      }
+      if (offlineNotice) offlineNotice.style.display = "none";
+
+      const img = document.getElementById("espCameraImg");
+      if (img) runDeterministicHitDetection(img);
+    }
+
+    function onCameraStreamError() {
+      if (webcamStream) return;
+      const dot = document.getElementById("camStatusDot");
+      const badge = document.getElementById("camStatusBadge");
+      const offlineNotice = document.getElementById("cameraOfflineNotice");
+      const desc = document.getElementById("cameraOfflineDesc");
+      const input = document.getElementById("cameraStreamUrlInput");
+
+      dot.style.backgroundColor = "#ff4444";
+      badge.innerText = "WIFI OFFLINE";
+      badge.style.color = "#ff4444";
+
+      const currentUrl = input ? input.value : "http://192.168.4.1/";
+      if (desc) desc.innerText = `Could not reach ${currentUrl}. ESP32-CAM may be plugged via USB instead of WiFi.`;
+      if (offlineNotice) offlineNotice.style.display = "flex";
+
+      logTerm(`[Camera] Note: WiFi stream ${currentUrl} offline. Switching to USB UVC mode if connected via USB.`);
+    }
+
+    // Optical Hit Detection & Scoring from Lalith689/camera
+    function handleCameraFeedClick(e) {
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+
+      const container = document.getElementById("cameraViewportContainer");
+      const rect = container.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const scaleX = 150.0 / rect.width;
+      const scaleY = 150.0 / rect.height;
+      const xMm = clickX * scaleX;
+      const yMm = clickY * scaleY;
+
+      const dx = xMm - 75.0;
+      const dy = yMm - 75.0;
+      const distMm = Math.sqrt(dx * dx + dy * dy);
+
+      let isHit = distMm <= 50.0;
+      let scoreLabel = isHit ? "HIT" : "MISS";
+      let hitColor = isHit ? "var(--mil-hit)" : "var(--mil-miss)";
+      if (distMm <= 8.0) {
+        hitColor = "#ffcc00";
+      }
+
+      const dot = document.createElement("div");
+      dot.style.position = "absolute";
+      dot.style.left = `${(clickX / rect.width) * 100}%`;
+      dot.style.top = `${(clickY / rect.height) * 100}%`;
+      dot.style.width = "10px";
+      dot.style.height = "10px";
+      dot.style.transform = "translate(-50%, -50%)";
+      dot.style.borderRadius = "50%";
+      dot.style.backgroundColor = hitColor;
+      dot.style.border = "1.5px solid #ffffff";
+      dot.style.boxShadow = `0 0 10px ${hitColor}`;
+      dot.style.pointerEvents = "none";
+
+      const impactLayer = document.getElementById("camImpactDotsContainer");
+      if (impactLayer) impactLayer.appendChild(dot);
+
+      document.getElementById("verdictLabel").innerText = `${scoreLabel} // ${distMm.toFixed(1)}mm FROM CENTER`;
+      const vBadge = document.getElementById("verdictBadge");
+      vBadge.innerText = scoreLabel;
+      vBadge.style.backgroundColor = isHit ? "var(--mil-hit)" : "var(--mil-miss)";
+      vBadge.style.color = "#ffffff";
+
+      recordShot(scoreLabel, distMm);
+      logTerm(`[Optical Hit] ${scoreLabel} | Dev: ${distMm.toFixed(1)}mm | Point: (${xMm.toFixed(1)}mm, ${yMm.toFixed(1)}mm)`);
+    }
+
+    // Camera Snapshot Grabber
+    function takeCameraSnapshot() {
+      try {
+        const offCanvas = document.createElement("canvas");
+        offCanvas.width = 640;
+        offCanvas.height = 480;
+        const ctx = offCanvas.getContext("2d");
+
+        const video = document.getElementById("webcamVideo");
+        const img = document.getElementById("espCameraImg");
+
+        if (webcamStream && video && video.style.display !== "none") {
+          ctx.drawImage(video, 0, 0, 640, 480);
+        } else if (img && img.style.display !== "none") {
+          ctx.drawImage(img, 0, 0, 640, 480);
+        }
+
+        ctx.strokeStyle = "rgba(255, 204, 0, 0.7)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(20, 20, 600, 440);
+
+        ctx.beginPath();
+        ctx.arc(320, 240, 30, 0, Math.PI * 2);
+        ctx.strokeStyle = "#ffcc00";
+        ctx.stroke();
+
+        ctx.font = "bold 14px monospace";
+        ctx.fillStyle = "#2cff55";
+        ctx.fillText(`SNYPTR OPTICAL CAM // ${new Date().toLocaleTimeString()}`, 30, 45);
+
+        const link = document.createElement("a");
+        link.download = `snyptr_snapshot_${Date.now()}.png`;
+        link.href = offCanvas.toDataURL("image/png");
+        link.click();
+
+        logTerm("[Camera Snapshot] Frame captured and saved successfully.");
+      } catch (err) {
+        logTerm(`[Snapshot Error] ${err.message}.`);
+      }
+    }
+
+    // --- TERMINAL LOGGING ---
+    function logTerm(msg) {
+      const out = document.getElementById("terminalOutput");
+      const line = document.createElement("div");
+      line.innerText = msg;
+      out.appendChild(line);
+      out.scrollTop = out.scrollHeight;
+    }
+
+    function clearTerminal() {
+      document.getElementById("terminalOutput").innerHTML = "";
+    }
+
+    function toggleTerminalModal() {
+      const modal = document.getElementById("terminalModal");
+      modal.style.display = (modal.style.display === "flex") ? "none" : "flex";
+    }
+
+    // Initialize initial state
+    updateCarriagePosition(0.0);
+    setStopPoint(1.50);
+    refreshCameraDevices();
+    startCvDetectionLoop();
+    logTerm("[System] SNYPTR 1.74-Metre Rail Dashboard initialized.");
+    logTerm("[System] Calibrated to GT2 30T Pulley: 6.0 cm / rev -> 33.33 steps/cm (5,000 steps = 1.50m).");
+    logTerm("[System] Controls: [S/Space] Start/Stop | [R / ◄] Return to Origin (0.0m) | [►] Stop Point | [▲/▼] Shuttle.");
+  </script>
+</body>
+</html>

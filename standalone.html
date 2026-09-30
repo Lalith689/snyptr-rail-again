@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SNYPTR // Standalone Tactical Target & Vision Dashboard</title>
+  <style>
+    :root {
+      --bg-dark: #070b12;
+      --panel-bg: rgba(15, 23, 38, 0.92);
+      --border-col: rgba(56, 189, 248, 0.22);
+      --cyan: #38bdf8;
+      --green: #10b981;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --text-main: #f1f5f9;
+      --text-dim: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 10%, #111c30 0%, #060911 100%);
+      color: var(--text-main);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: rgba(9, 14, 24, 0.95);
+      border-bottom: 1px solid var(--border-col);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0284c7, #10b981);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 18px;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+    .brand h1 {
+      font-size: 18px;
+      letter-spacing: 1.5px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .brand span {
+      font-size: 11px;
+      color: var(--cyan);
+      display: block;
+      letter-spacing: 1px;
+    }
+    .conn-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #cbd5e1;
+    }
+    .pill.online {
+      background: rgba(6, 95, 70, 0.45);
+      border-color: var(--green);
+      color: #34d399;
+    }
+    .pill.offline {
+      background: rgba(127, 29, 29, 0.35);
+      border-color: var(--red);
+      color: #fca5a5;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .btn {
+      background: rgba(14, 165, 233, 0.18);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover {
+      background: rgba(14, 165, 233, 0.35);
+      transform: translateY(-1px);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #059669);
+      color: #fff;
+      border: none;
+      padding: 12px 22px;
+      font-size: 14px;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.5);
+    }
+    main {
+      display: grid;
+      grid-template-columns: 340px 1fr 360px;
+      gap: 16px;
+      padding: 16px 24px;
+      flex: 1;
+    }
+    @media (max-width: 1200px) {
+      main { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-col);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.45);
+    }
+    .panel-title {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 8px;
+    }
+    /* Pop-Up Status Card */
+    .status-hero {
+      text-align: center;
+      padding: 18px 12px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #1e293b;
+      transition: all 0.2s ease;
+    }
+    .status-hero.state-up {
+      background: rgba(6, 78, 59, 0.35);
+      border-color: var(--green);
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+    }
+    .status-hero.state-hit {
+      background: rgba(127, 29, 29, 0.45);
+      border-color: var(--red);
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.35);
+    }
+    .status-label {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .status-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .countdown-wrap {
+      height: 12px;
+      background: #0f172a;
+      border-radius: 99px;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+      margin-top: 12px;
+    }
+    .countdown-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #38bdf8);
+      transition: width 0.08s linear;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .kpi-box {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .kpi-box .lbl {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+    .kpi-box .val {
+      font-size: 20px;
+      font-weight: 800;
+      color: #fff;
+      margin-top: 2px;
+      font-family: Consolas, monospace;
+    }
+    /* Center Viewport */
+    .viewport-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      min-height: 520px;
+      background: #04070d;
+      border-radius: 12px;
+      border: 1px solid #1e293b;
+      overflow: hidden;
+    }
+    #visionCanvas {
+      width: 100%;
+      max-width: 560px;
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      cursor: crosshair;
+    }
+    .viewport-hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+    .hud-tag {
+      background: rgba(7, 11, 18, 0.82);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 5px 10px;
+      border-radius: 6px;
+      color: #38bdf8;
+    }
+    .shot-list {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .shot-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(15, 23, 42, 0.75);
+      border-left: 4px solid #38bdf8;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: Consolas, monospace;
+    }
+    .shot-row.hit { border-left-color: var(--green); }
+    .shot-row.miss { border-left-color: var(--red); }
+    .kbd {
+      display: inline-block;
+      padding: 2px 7px;
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      font-family: monospace;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .rail-controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-logo">S</div>
+    <div>
+      <h1>SNYPTR // TACTICAL COMMAND</h1>
+      <span>STANDALONE ESP32-P4 OPTIMAL-ZONE VISION + 5.0s SERVO POP-UP SYSTEM</span>
+    </div>
+  </div>
+
+  <div class="conn-bar">
+    <div id="wifiPill" class="pill offline">
+      <span class="dot"></span>
+      <span id="wifiStatusText">Wi-Fi AP (192.168.4.1): Connecting...</span>
+    </div>
+    <div id="p4UsbPill" class="pill">
+      <span class="dot"></span>
+      <span id="p4UsbText">P4 Camera: Standalone UART Bridge Active</span>
+    </div>
+    <button class="btn" onclick="connectP4UsbSerial()">Connect P4 Camera USB (Optional Live Video)</button>
+    <button class="btn" onclick="connectPopUsbSerial()">Connect Pop/Rail USB (Optional)</button>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT PANEL: POP-UP & 5-SECOND CYCLE CONTROL -->
+  <section class="panel">
+    <div class="panel-title">
+      <span>1. Pop-Up Target Cycle (5.0s)</span>
+      <span class="kbd">Press 0</span>
+    </div>
+
+    <div id="heroCard" class="status-hero">
+      <div id="heroStateText" class="status-label">TARGET DOWN (IDLE)</div>
+      <div id="heroSubText" class="status-sub">Press [0] to pop up target for 5.0 seconds</div>
+      <div class="countdown-wrap">
+        <div id="countdownBar" class="countdown-fill"></div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="triggerPop5s()">
+        🎯 POP TARGET [Key 0] (5.0s)
+      </button>
+      <button class="btn btn-danger" onclick="sendPopCommand('DOWN,1')">
+        DROP
+      </button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-box">
+        <div class="lbl">Countdown Timer</div>
+        <div id="kpiTimer" class="val">5.00 s</div>
+      </div>
+      <div class="kpi-box">
+        <div class="lbl">Last Outcome</div>
+        <div id="kpiOutcome" class="val" style="color:#38bdf8;">READY</div>
+      </div>
+      <div class="kpi-box">
+        <div class="lbl">Optimal Hits</div>
+        <div id="kpiHits" class="val" style="color:#10b981;">0</div>
+      </div>
+      <div class="kpi-box">
+        <div class="lbl">5s Timeouts (Miss)</div>
+        <div id="kpiMisses" class="val" style="color:#f87171;">0</div>
+      </div>
+      <div class="kpi-box">
+        <div class="lbl">Reaction Time</div>
+        <div id="kpiReaction" class="val">-- ms</div>
+      </div>
+      <div class="kpi-box">
+        <div class="lbl">Last Shot Score</div>
+        <div id="kpiScore" class="val">--</div>
+      </div>
+    </div>
+
+    <div class="panel-title" style="margin-top:6px;">
+      <span>2. Stepper Rail Positioning</span>
+      <span id="railPosLabel" style="color:#fff;">0.0 cm</span>
+    </div>
+
+    <div class="rail-controls">
+      <button class="btn" onmousedown="sendPopCommand('LEFT')" onmouseup="sendPopCommand('STOP')">◀ LEFT [A]</button>
+      <button class="btn btn-danger" onclick="sendPopCommand('STOP')">■ STOP [S]</button>
+      <button class="btn" onmousedown="sendPopCommand('RIGHT')" onmouseup="sendPopCommand('STOP')">RIGHT [D] ▶</button>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn" style="flex:1;" onclick="sendPopCommand('HOME')">⌂ HOME (0cm)</button>
+      <button class="btn" style="flex:1;" onclick="sendPopCommand('ZERO')">◎ ZERO POS</button>
+    </div>
+  </section>
+
+  <!-- CENTER PANEL: 800x800 OPTIMAL-AREA TARGET & CAMERA VIEWPORT -->
+  <section class="panel">
+    <div class="panel-title">
+      <span>ESP32-P4 OV5647 (800x800 RGB565 / Exp=65) — Optimal Area Reticle</span>
+      <span id="fpsBadge">Standalone 15 FPS</span>
+    </div>
+
+    <div class="viewport-container">
+      <div class="viewport-hud">
+        <div class="hud-tag">OPTIMAL ZONE: Center (400,400) | Radius = 275 px</div>
+        <div id="hudCoordTag" class="hud-tag">Last Impact: None</div>
+      </div>
+      <canvas id="visionCanvas" width="800" height="800"></canvas>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-dim); flex-wrap:wrap; gap:8px;">
+      <div>
+        <span class="kbd">0</span> Pop Target (5.0s) &nbsp;|&nbsp;
+        <span class="kbd">A</span> / <span class="kbd">D</span> Move Rail &nbsp;|&nbsp;
+        <span class="kbd">SPACE</span> Stop
+      </div>
+      <div>
+        <button class="btn" onclick="simulateTestHit(true)">Simulate Optimal Hit</button>
+        <button class="btn" onclick="clearShotHistory()">Clear Shots</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT PANEL: TELEMETRY & SHOT LOG -->
+  <section class="panel">
+    <div class="panel-title">
+      <span>Live Shot & Fallback Log</span>
+      <span id="shotCountBadge">0 Shots</span>
+    </div>
+
+    <div id="shotList" class="shot-list"></div>
+
+    <div class="panel-title" style="margin-top:auto;">
+      <span>Hardware Pinout & System Architecture</span>
+    </div>
+    <div style="font-size:11px; color:var(--text-dim); line-height:1.55; background:rgba(9,14,24,0.8); padding:10px; border-radius:8px; border:1px solid #1e293b;">
+      <div><b style="color:#38bdf8;">Wi-Fi Hotspot:</b> SSID <code>ESP32_Camera</code> / Pass <code>password123</code> (<code>192.168.4.1</code>)</div>
+      <div><b style="color:#10b981;">Pop Servo PCA9685:</b> <code>SDA=GPIO 21</code>, <code>SCL=GPIO 22</code> (<code>UP=150</code>, <code>DOWN=350</code>)</div>
+      <div><b style="color:#f59e0b;">P4 &lt;-&gt; Pop UART:</b> P4 <code>GPIO 21 (TX)</code> &rarr; Pop <code>GPIO 16 (RX2)</code>; Pop <code>GPIO 17 (TX2)</code> &rarr; P4 <code>GPIO 22/27 (RX)</code></div>
+      <div><b style="color:#e879f9;">ESP32-P4 Camera:</b> OV5647 MIPI-CSI <code>800x800 RGB565</code>, Exposure <code>65</code>, Standalone Optimal-Zone Detector</div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const ESP32_AP_URL = "http://192.168.4.1";
+  const OPTIMAL_RADIUS_PX = 275;
+  const BULLSEYE_RADIUS_PX = 110;
+  const POP_CYCLE_MS = 5000;
+
+  let wifiConnected = false;
+  let targetState = "DOWN";
+  let localPopStartMs = 0;
+  let localTimerActive = false;
+  let lastProcessedShotSeq = -1;
+
+  let totalHits = 0;
+  let totalMisses = 0;
+  let shots = []; // { seq, outcome, x, y, ring, reactionMs, timeStr }
+  let latestCameraFrameImg = null;
+  let popSerialWriter = null;
+
+  const canvas = document.getElementById("visionCanvas");
+  const ctx = canvas.getContext("2d");
+
+  // Audio feedback synthesizer
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function playTone(freq, durationMs, type = "sine") {
+    try {
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + durationMs / 1000);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + durationMs / 1000);
+    } catch (e) {}
+  }
+
+  function calculateRingScore(x, y) {
+    const dx = x - 400;
+    const dy = y - 400;
+    const rPx = Math.hypot(dx, dy);
+    const rMm = (rPx / OPTIMAL_RADIUS_PX) * 25.0;
+    let ring = 0;
+    if (rMm <= 0.8) ring = 11; // 10X
+    else if (rMm <= 2.5) ring = 10;
+    else if (rMm <= 5.0) ring = 9;
+    else if (rMm <= 7.5) ring = 8;
+    else if (rMm <= 10.0) ring = 7;
+    else if (rMm <= 13.0) ring = 6;
+    else if (rMm <= 16.0) ring = 5;
+    else if (rMm <= 19.0) ring = 4;
+    else if (rMm <= 22.0) ring = 3;
+    else if (rMm <= 25.0) ring = 2;
+    else if (rMm <= 28.0) ring = 1;
+    return { ring, rPx, rMm, optimal: rPx <= OPTIMAL_RADIUS_PX };
+  }
+
+  async function sendPopCommand(cmd) {
+    // 1. Send over USB Serial if connected
+    if (popSerialWriter) {
+      try {
+        const enc = new TextEncoder();
+        await popSerialWriter.write(enc.encode(cmd + "\n"));
+      } catch (e) {}
+    }
+    // 2. Send over Wi-Fi AP (192.168.4.1)
+    try {
+      await fetch(`${ESP32_AP_URL}/cmd?c=${encodeURIComponent(cmd)}`, { mode: "cors", cache: "no-store" });
+    } catch (e) {}
+  }
+
+  function triggerPop5s() {
+    targetState = "UP";
+    localPopStartMs = performance.now();
+    localTimerActive = true;
+    playTone(660, 120, "triangle");
+    updateHeroUI("UP", 5000, "ACTIVE");
+    sendPopCommand("POP,1,5000");
+  }
+
+  function updateHeroUI(state, remMs, outcome) {
+    const hero = document.getElementById("heroCard");
+    const stateTxt = document.getElementById("heroStateText");
+    const subTxt = document.getElementById("heroSubText");
+    const bar = document.getElementById("countdownBar");
+    const kpiTimer = document.getElementById("kpiTimer");
+    const kpiOutcome = document.getElementById("kpiOutcome");
+
+    kpiOutcome.textContent = outcome;
+
+    if (state === "UP") {
+      hero.className = "status-hero state-up";
+      stateTxt.textContent = `TARGET POPPED UP (${(remMs / 1000).toFixed(2)}s)`;
+      subTxt.textContent = "ESP32-P4 Optimal-Zone Vision Armed — Shoot Inside Green/Red Zone!";
+      bar.style.width = `${Math.max(0, Math.min(100, (remMs / POP_CYCLE_MS) * 100))}%`;
+      kpiTimer.textContent = `${(remMs / 1000).toFixed(2)} s`;
+    } else if (outcome === "HIT") {
+      hero.className = "status-hero state-hit";
+      stateTxt.textContent = "🎯 OPTIMAL HIT — TARGET FELL BACK!";
+      subTxt.textContent = "ESP32-P4 confirmed hit inside optimal area & dropped servo immediately";
+      bar.style.width = "0%";
+      kpiTimer.textContent = "0.00 s";
+    } else if (outcome === "MISS") {
+      hero.className = "status-hero";
+      stateTxt.textContent = "⏱️ 5.0s EXPIRED — TARGET FELL BACK";
+      subTxt.textContent = "No shot detected in optimal area within 5 seconds";
+      bar.style.width = "0%";
+      kpiTimer.textContent = "0.00 s";
+    } else {
+      hero.className = "status-hero";
+      stateTxt.textContent = "TARGET DOWN (STANDBY)";
+      subTxt.textContent = "Press [0] on keyboard to pop target for 5.0 seconds";
+      bar.style.width = "0%";
+      kpiTimer.textContent = "5.00 s";
+    }
+  }
+
+  function recordOutcomeEvent(outcome, x, y, reactionMs, seq) {
+    localTimerActive = false;
+    targetState = "DOWN";
+    const timeStr = new Date().toLocaleTimeString();
+
+    if (outcome === "HIT") {
+      const sc = calculateRingScore(x, y);
+      const ringStr = sc.ring === 11 ? "10X" : String(sc.ring);
+      totalHits++;
+      document.getElementById("kpiHits").textContent = String(totalHits);
+      document.getElementById("kpiReaction").textContent = `${reactionMs} ms`;
+      document.getElementById("kpiScore").textContent = `Ring ${ringStr}`;
+      document.getElementById("hudCoordTag").textContent =
+        `OPTIMAL HIT: (${x}, ${y}) | Ring ${ringStr} | ${reactionMs}ms`;
+
+      playTone(880, 140, "sine");
+      setTimeout(() => playTone(1320, 220, "sine"), 110);
+
+      shots.unshift({
+        seq,
+        outcome: "HIT",
+        x,
+        y,
+        ringStr,
+        reactionMs,
+        timeStr
+      });
+      updateHeroUI("DOWN", 0, "HIT");
+    } else if (outcome === "MISS") {
+      totalMisses++;
+      document.getElementById("kpiMisses").textContent = String(totalMisses);
+      document.getElementById("kpiScore").textContent = "MISS (5s)";
+      playTone(240, 300, "sawtooth");
+
+      shots.unshift({
+        seq,
+        outcome: "MISS",
+        x: null,
+        y: null,
+        ringStr: "TIMEOUT",
+        reactionMs: 5000,
+        timeStr
+      });
+      updateHeroUI("DOWN", 0, "MISS");
+    }
+
+    renderShotLog();
+  }
+
+  function renderShotLog() {
+    const list = document.getElementById("shotList");
+    document.getElementById("shotCountBadge").textContent = `${shots.length} Shots`;
+    list.innerHTML = shots.slice(0, 25).map(s => {
+      if (s.outcome === "HIT") {
+        return `<div class="shot-row hit">
+          <span><b>#${s.seq} HIT</b> [Ring ${s.ringStr}] (${s.x}, ${s.y})</span>
+          <span style="color:#34d399;">${s.reactionMs}ms &bull; Fell Back</span>
+        </div>`;
+      } else {
+        return `<div class="shot-row miss">
+          <span><b>#${s.seq} MISS</b> [5.0s No Optimal Hit]</span>
+          <span style="color:#f87171;">5000ms &bull; Auto-Fell</span>
+        </div>`;
+      }
+    }).join("");
+  }
+
+  function clearShotHistory() {
+    shots = [];
+    totalHits = 0;
+    totalMisses = 0;
+    document.getElementById("kpiHits").textContent = "0";
+    document.getElementById("kpiMisses").textContent = "0";
+    renderShotLog();
+  }
+
+  function simulateTestHit(insideOptimal) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = insideOptimal ? (Math.random() * 180) : (310 + Math.random() * 60);
+    const x = Math.round(400 + Math.cos(angle) * r);
+    const y = Math.round(400 + Math.sin(angle) * r);
+    if (insideOptimal) {
+      fetch(`${ESP32_AP_URL}/hit?x=${x}&y=${y}&p=95`).catch(() => {});
+      recordOutcomeEvent("HIT", x, y, Math.round(450 + Math.random() * 1200), shots.length + 1);
+    }
+  }
+
+  // Poll Pop-Up ESP32 Wi-Fi Telemetry every 100ms
+  setInterval(async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 450);
+      const res = await fetch(`${ESP32_AP_URL}/telemetry`, { signal: controller.signal, cache: "no-store" });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+
+      if (!wifiConnected) {
+        wifiConnected = true;
+        const pill = document.getElementById("wifiPill");
+        pill.className = "pill online";
+        document.getElementById("wifiStatusText").textContent = "Wi-Fi AP (192.168.4.1): CONNECTED";
+      }
+
+      if (typeof data.railCm === "number") {
+        document.getElementById("railPosLabel").textContent = `${data.railCm.toFixed(1)} cm`;
+      }
+
+      if (lastProcessedShotSeq === -1) {
+        lastProcessedShotSeq = data.shotSeq || 0;
+      } else if (data.shotSeq > lastProcessedShotSeq) {
+        lastProcessedShotSeq = data.shotSeq;
+        if (data.lastOutcome === "HIT") {
+          recordOutcomeEvent("HIT", data.x || 400, data.y || 400, data.reactionMs || 0, data.shotSeq);
+        } else if (data.lastOutcome === "MISS") {
+          recordOutcomeEvent("MISS", null, null, 5000, data.shotSeq);
+        }
+      }
+
+      if (data.targetState === "UP") {
+        targetState = "UP";
+        localTimerActive = false;
+        updateHeroUI("UP", data.remainingMs || 0, "ACTIVE");
+      } else if (!localTimerActive && targetState === "UP" && data.targetState === "DOWN") {
+        targetState = "DOWN";
+        updateHeroUI("DOWN", 0, data.lastOutcome || "READY");
+      }
+    } catch (e) {
+      if (wifiConnected) {
+        wifiConnected = false;
+        const pill = document.getElementById("wifiPill");
+        pill.className = "pill offline";
+        document.getElementById("wifiStatusText").textContent = "Wi-Fi AP (192.168.4.1): Offline / Local Sim";
+      }
+      // Fallback local 5.0s timer if testing dashboard offline
+      if (localTimerActive) {
+        const elapsed = performance.now() - localPopStartMs;
+        if (elapsed >= POP_CYCLE_MS) {
+          recordOutcomeEvent("MISS", null, null, 5000, shots.length + 1);
+        } else {
+          updateHeroUI("UP", POP_CYCLE_MS - elapsed, "ACTIVE");
+        }
+      }
+    }
+  }, 100);
+
+  // Render 800x800 Tactical Target & Camera Reticle Canvas
+  function renderCanvas() {
+    ctx.clearRect(0, 0, 800, 800);
+
+    if (latestCameraFrameImg) {
+      ctx.drawImage(latestCameraFrameImg, 0, 0, 800, 800);
+    } else {
+      // Crisp dark tactical grid background
+      ctx.fillStyle = "#060a12";
+      ctx.fillRect(0, 0, 800, 800);
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.06)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 800; i += 40) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 800); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke();
+      }
+    }
+
+    // Draw Non-Optimal Outer Boundary Shading
+    ctx.save();
+    ctx.strokeStyle = "rgba(239, 68, 68, 0.75)";
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 6]);
+    ctx.beginPath();
+    ctx.arc(400, 400, OPTIMAL_RADIUS_PX, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Draw Scoring Rings inside Optimal Area (r <= 275px)
+    for (let ring = 1; ring <= 10; ring++) {
+      const r = (11 - ring) * (OPTIMAL_RADIUS_PX / 10);
+      ctx.beginPath();
+      ctx.arc(400, 400, r, 0, Math.PI * 2);
+      ctx.strokeStyle = ring >= 7 ? "rgba(16, 185, 129, 0.45)" : "rgba(56, 189, 248, 0.25)";
+      ctx.lineWidth = ring === 7 ? 2.5 : 1;
+      ctx.stroke();
+    }
+
+    // Fill subtle Green Bullseye Optimal Zone
+    ctx.beginPath();
+    ctx.arc(400, 400, BULLSEYE_RADIUS_PX, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(16, 185, 129, 0.12)";
+    ctx.fill();
+
+    // Crosshairs
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(400, 80); ctx.lineTo(400, 720); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(80, 400); ctx.lineTo(720, 400); ctx.stroke();
+
+    // Draw Impact Dots
+    shots.forEach((s, idx) => {
+      if (s.outcome === "HIT" && s.x !== null && s.y !== null) {
+        const isLatest = idx === 0;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, isLatest ? 12 : 7, 0, Math.PI * 2);
+        ctx.fillStyle = isLatest ? "#10b981" : "rgba(56, 189, 248, 0.75)";
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+      }
+    });
+
+    requestAnimationFrame(renderCanvas);
+  }
+  requestAnimationFrame(renderCanvas);
+
+  // Keyboard Listeners: Press [0] to Pop Target for 5 Seconds!
+  window.addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+    if (e.key === "0") {
+      e.preventDefault();
+      triggerPop5s();
+    } else if (e.key === "a" || e.key === "A" || e.key === "ArrowLeft") {
+      sendPopCommand("LEFT");
+    } else if (e.key === "d" || e.key === "D" || e.key === "ArrowRight") {
+      sendPopCommand("RIGHT");
+    } else if (e.key === " " || e.key === "s" || e.key === "S") {
+      sendPopCommand("STOP");
+    }
+  });
+
+  window.addEventListener("keyup", (e) => {
+    if (["a", "A", "d", "D", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      sendPopCommand("STOP");
+    }
+  });
+
+  // Optional WebSerial connection to Pop/Rail ESP32
+  async function connectPopUsbSerial() {
+    if (!("serial" in navigator)) return alert("Use Chrome or Edge for WebSerial.");
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      popSerialWriter = port.writable.getWriter();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Optional WebSerial direct video stream from ESP32-P4 (2,000,000 baud 0xAA 0x55 packets)
+  async function connectP4UsbSerial() {
+    if (!("serial" in navigator)) return alert("Use Chrome or Edge for WebSerial.");
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 2000000 });
+      document.getElementById("p4UsbPill").className = "pill online";
+      document.getElementById("p4UsbText").textContent = "P4 Camera: Live USB Video Active";
+
+      const reader = port.readable.getReader();
+      let buf = new Uint8Array(0);
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const merged = new Uint8Array(buf.length + value.length);
+        merged.set(buf);
+        merged.set(value, buf.length);
+        buf = merged;
+
+        while (buf.length >= 15) {
+          let syncIdx = -1;
+          for (let i = 0; i <= buf.length - 3; i++) {
+            if (buf[i] === 0xAA && buf[i + 1] === 0x55 && buf[i + 2] === 0x01) {
+              syncIdx = i;
+              break;
+            }
+          }
+          if (syncIdx === -1) {
+            buf = buf.slice(Math.max(0, buf.length - 2));
+            break;
+          }
+          if (syncIdx > 0) buf = buf.slice(syncIdx);
+          if (buf.length < 15) break;
+
+          const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+          const payloadLen = view.getUint32(7, true);
+          if (payloadLen <= 0 || payloadLen > 350000) {
+            buf = buf.slice(3);
+            continue;
+          }
+          if (buf.length < 15 + payloadLen) break;
+
+          const payload = buf.slice(15, 15 + payloadLen);
+          buf = buf.slice(15 + payloadLen);
+
+          // Check 32-byte steganographic shot_metadata_t at end of JPEG
+          if (payloadLen > 32) {
+            const mOff = payloadLen - 32;
+            if (payload[mOff] === 0xDE && payload[mOff + 1] === 0xAD &&
+                payload[mOff + 2] === 0xBE && payload[mOff + 3] === 0xEF) {
+              const hitFound = payload[mOff + 4];
+              const mView = new DataView(payload.buffer, payload.byteOffset + mOff, 32);
+              const hx = mView.getUint16(8, true);
+              const hy = mView.getUint16(10, true);
+              if (hitFound === 1 && targetState === "UP") {
+                sendPopCommand(`HIT,1,${hx},${hy},90`);
+                recordOutcomeEvent("HIT", hx, hy, Math.round(performance.now() - localPopStartMs), shots.length + 1);
+              }
+            }
+          }
+
+          const jpegBytes = payload.slice(0, payloadLen - 32);
+          const blob = new Blob([jpegBytes], { type: "image/jpeg" });
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            latestCameraFrameImg = img;
+            URL.revokeObjectURL(url);
+          };
+          img.src = url;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+</script>
+</body>
+</html>

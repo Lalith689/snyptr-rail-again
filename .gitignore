@@ -1,0 +1,13 @@
+# ESP-IDF Build & Managed Components
+p4_camera/build/
+p4_camera/managed_components/
+**/build/
+**/managed_components/
+sdkconfig
+sdkconfig.old
+
+# Temporary inspection folders
+temp_cam_inspect/
+__pycache__/
+*.pyc
+*.log
